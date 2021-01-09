@@ -467,9 +467,9 @@ int main(int argc, char** argv)
     /*WARNING*/ if (!hasCorrectUID("loolforkit"))
     /*WARNING*/ {
     /*WARNING*/     // don't allow if any capability is set (unless root; who runs this
-    /*WARNING*/     // as root and provides --disable-lool-user-checking knows what they
+    /*WARNING*/     // as root or runs this in a container and provides --disable-lool-user-checking knows what they
     /*WARNING*/     // are doing)
-    /*WARNING*/     if (hasAnyCapability() && !hasUID("root"))
+    /*WARNING*/     if (hasAnyCapability() && (!hasUID("root") || !isInContainer()))
     /*WARNING*/     {
     /*WARNING*/         if (!checkLoolUser)
     /*WARNING*/             std::cerr << "Security: --disable-lool-user-checking failed, loolforkit has some capabilities set." << std::endl;

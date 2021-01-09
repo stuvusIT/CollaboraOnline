@@ -32,6 +32,30 @@ inline int hasUID(const char *userId)
     return 0;
 }
 
+inline int isInContainer()
+{
+#ifdef __linux__
+    FILE *cgroup;
+    char line[80];
+    const char *docker = "/docker/";
+    cgroup = fopen("/proc/self/cgroup", "r");
+    if(!cgroup)
+    {
+        fprintf(stderr, "Error: cannot open /proc/self/cgroup\n");
+        return 0;
+    }
+    if (fgets(line, sizeof(line), cgroup) == NULL)
+    {
+        fprintf(stderr, "Error: cannot read from /proc/self/cgroup\n");
+        return 0;
+    }
+    fclose(cgroup);
+    if (strstr(line, docker) != NULL)
+        return 1;
+#endif
+    return 0;
+}
+
 inline int hasCorrectUID(const char *appName)
 {
 #if ENABLE_DEBUG
