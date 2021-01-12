@@ -185,8 +185,6 @@ L.Control.JSDialogBuilder = L.Control.extend({
 			builder._fixedtextControl(parentContainer, fixedTextData, builder);
 		}
 
-		console.debug('baseSpinField: ' + data.id);
-
 		var div = L.DomUtil.create('div', 'spinfieldcontainer', parentContainer);
 		div.id = data.id;
 		controls['container'] = div;
@@ -320,6 +318,16 @@ L.Control.JSDialogBuilder = L.Control.extend({
 		}
 
 		return '';
+	},
+
+	_toolboxHandler: function(parentContainer, data) {
+		if (data.enabled === false || data.enabled === 'false') {
+			for (var index in data.children) {
+				data.children[index].enabled = false;
+			}
+		}
+
+		return true;
 	},
 
 	_containerHandler: function(parentContainer, data, builder) {
@@ -461,7 +469,7 @@ L.Control.JSDialogBuilder = L.Control.extend({
 
 		var leftDiv = L.DomUtil.create('div', 'ui-header-left', sectionTitle);
 		var titleClass = '';
-		console.debug('sectionTitle.id' + sectionTitle.id);
+
 		switch (sectionTitle.id)
 		{
 		case 'paperformat':
@@ -538,12 +546,16 @@ L.Control.JSDialogBuilder = L.Control.extend({
 		if (!data.nosubmenu)
 		{
 			$(contentDiv).hide();
-			if (builder.wizard && data.enabled !== 'false') {
-				$(sectionTitle).click(function(event, data) {
-					builder.wizard.goLevelDown(contentDiv, data);
-					if (contentNode && contentNode.onshow)
-						contentNode.onshow();
-				});
+			if (builder.wizard) {
+				if (data.enabled !== 'false' && data.enabled !== false) {
+					$(sectionTitle).click(function(event, data) {
+						builder.wizard.goLevelDown(contentDiv, data);
+						if (contentNode && contentNode.onshow)
+							contentNode.onshow();
+					});
+				} else {
+					$(arrowSpan).hide();
+				}
 			} else {
 				console.debug('Builder used outside of mobile wizard: please implement the click handler');
 			}
@@ -905,24 +917,28 @@ L.Control.JSDialogBuilder = L.Control.extend({
 	},
 
 	_radiobuttonControl: function(parentContainer, data, builder) {
-		var container = L.DomUtil.createWithId('div', data.id + '-container', parentContainer);
+		var container = L.DomUtil.createWithId('div', data.id, parentContainer);
 		L.DomUtil.addClass(container, 'radiobutton');
+		L.DomUtil.addClass(container, builder.options.cssClass);
 
-		var radiobutton = L.DomUtil.createWithId('input', data.id, container);
+		var radiobutton = L.DomUtil.create('input', '', container);
 		radiobutton.type = 'radio';
+
+		if (data.group)
+			radiobutton.name = data.group;
 
 		var radiobuttonLabel = L.DomUtil.create('label', '', container);
 		radiobuttonLabel.innerHTML = builder._cleanText(data.text);
 		radiobuttonLabel.for = data.id;
 
-		if (data.enabled == 'false')
+		if (data.enabled === 'false' || data.enabled === false)
 			$(radiobutton).attr('disabled', 'disabled');
 
-		if (data.checked == 'true')
-			$(radiobutton).attr('checked', 'checked');
+		if (data.checked === 'true' || data.checked === true)
+			$(radiobutton).prop('checked', true);
 
 		radiobutton.addEventListener('change', function() {
-			builder.callback('radiobutton', 'change', radiobutton, this.checked, builder);
+			builder.callback('radiobutton', 'change', container, this.checked, builder);
 		});
 
 		if (data.hidden)
@@ -2270,7 +2286,8 @@ L.Control.JSDialogBuilder = L.Control.extend({
 			gradientItem.endcolor = color;
 			builder.map.sendUnoCommand('.uno:FillPageGradient?FillPageGradientJSON:string=' + JSON.stringify(gradientItem));
 			return;
-		} else if (data.id === 'Color' || data.id === 'CharBackColor' || data.id === 'FillColor') {
+		} else if (data.id === 'Color' || data.id === 'CharBackColor' || data.id === 'FillColor'
+			|| data.id === 'XLineColor') {
 			var params = {};
 			params[data.id] = {
 				type : 'long',
@@ -2454,6 +2471,11 @@ L.Control.JSDialogBuilder = L.Control.extend({
 				else
 					$('#border-' + i).addClass('selected');
 			}
+
+			if (builder.wizard && builder.wizard._refreshSidebar) {
+				builder.wizard._refreshSidebar(0);
+				builder.refreshSidebar = false;
+			}
 		};
 
 		builder.map.on('commandstatechanged', function(e) {
@@ -2531,7 +2553,7 @@ L.Control.JSDialogBuilder = L.Control.extend({
 		var currentWidth = parseInt(builder.map['stateChangeHandler'].getItemValue('.uno:LineWidth'));
 		var currentWidthText = currentWidth ? String(parseFloat(currentWidth)/100.0) : '0.5';
 
-		var lineData = { min: 0.5, max: 5, id: 'linewidth', text: currentWidthText, readOnly: true };
+		var lineData = { min: 0.5, max: 5, id: 'linewidth', text: currentWidthText, enabled: data.enabled, readOnly: true };
 
 		var callbackFunction = function(objectType, eventType, object) {
 			var newValue = 0;

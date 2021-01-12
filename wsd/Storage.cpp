@@ -424,10 +424,10 @@ StorageBase::UploadResult LocalStorage::uploadLocalFileToStorage(
     {
         LOG_ERR("copyTo(\"" << getRootFilePathAnonym() << "\", \"" << LOOLWSD::anonymizeUrl(path)
                             << "\") failed: " << exc.displayText());
-        return StorageBase::UploadResult::Result::FAILED;
+        return UploadResult(UploadResult::Result::FAILED, "Internal error.");
     }
 
-    return StorageBase::UploadResult::Result::OK;
+    return UploadResult(UploadResult::Result::OK);
 }
 
 #if !MOBILEAPP
@@ -739,6 +739,20 @@ WopiStorage::WOPIFileInfo::WOPIFileInfo(const FileInfo &fileInfo,
     JsonUtil::findJSONValue(object, "TemplateSaveAs", _templateSaveAs);
     JsonUtil::findJSONValue(object, "TemplateSource", _templateSource);
 
+    // UserFriendlyName is used as the Author when loading the document.
+    // If it's missing, document loading fails. Since the UserFriendlyName
+    // field is optional in WOPI specs, it's often left out by integrators.
+    if (_username.empty())
+    {
+        _username = "UnknownUser"; // Default to something sensible yet friendly.
+        if (!_userId.empty())
+            _username += '_' + _userId;
+
+        LOG_WRN("WOPI::CheckFileInfo does not specify a valid UserFriendlyName for the current "
+                "user. Temporarily ["
+                << _username << "] will be used until a valid name is specified.");
+    }
+
     std::ostringstream wopiResponse;
 
     // Anonymize key values.
@@ -1005,6 +1019,7 @@ WopiStorage::uploadLocalFileToStorage(const Authorization& auth, const std::stri
     if (!fileStat.good())
     {
         LOG_ERR("Cannot access file [" << filePathAnonym << "] to upload to wopi storage.");
+        return UploadResult(UploadResult::Result::FAILED, "File not found.");
     }
 
     const std::size_t size = (fileStat.good() ? fileStat.size() : 0);
@@ -1115,17 +1130,18 @@ WopiStorage::uploadLocalFileToStorage(const Authorization& auth, const std::stri
         Poco::StreamCopier::copyStream(rs, oss);
         return handleUploadToStorageResponse(details, oss.str());
     }
-    catch (const Poco::Exception& pexc)
+    catch (const Poco::Exception& ex)
     {
-        LOG_ERR("Cannot upload file to WOPI storage uri [" << uriAnonym << "]. Error: " <<
-                pexc.displayText() << (pexc.nested() ? " (" + pexc.nested()->displayText() + ')' : ""));
+        LOG_ERR("Cannot upload file to WOPI storage uri ["
+                << uriAnonym << "]. Error: " << ex.displayText()
+                << (ex.nested() ? " (" + ex.nested()->displayText() + ')' : ""));
     }
-    catch (const BadRequestException& exc)
+    catch (const std::exception& ex)
     {
-        LOG_ERR("Cannot upload file to WOPI storage uri [" + uriAnonym + "]. Error: " << exc.what());
+        LOG_ERR("Cannot upload file to WOPI storage uri [" + uriAnonym + "]. Error: " << ex.what());
     }
 
-    return StorageBase::UploadResult::Result::FAILED;
+    return UploadResult(UploadResult::Result::FAILED, "Internal error.");
 }
 
 StorageBase::UploadResult
@@ -1133,12 +1149,11 @@ WopiStorage::handleUploadToStorageResponse(const WopiUploadDetails& details,
                                            std::string responseString)
 {
     // Assume we failed, unless we have confirmation of success.
-    StorageBase::UploadResult result(StorageBase::UploadResult::Result::FAILED);
+    StorageBase::UploadResult result(UploadResult::Result::FAILED, responseString);
     try
     {
+        // Save a copy of the response because we might need to anonymize.
         const std::string origResponseString = responseString;
-
-        result.setErrorMsg(responseString);
 
         const std::string wopiLog(details.isSaveAs
                                       ? "WOPI::PutRelativeFile"
