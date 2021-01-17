@@ -78,6 +78,7 @@ L.Control.Menubar = L.Control.extend({
 				{name: _UNO('.uno:InsertGraphic', 'text'), id: 'insertgraphicremote', type: 'action'},
 				{name: _UNO('.uno:InsertAnnotation', 'text'), id: 'insertcomment', type: 'action'},
 				{uno: '.uno:InsertObjectChart'},
+				{name: _UNO('.uno:FontworkGalleryFloater'), uno: '.uno:FontworkGalleryFloater'},
 				{type: 'separator'},
 				{uno: '.uno:InsertSection', id: 'insertsection'},
 				{name: _UNO('.uno:InsertField', 'text'), type: 'menu', menu: [
@@ -312,6 +313,7 @@ L.Control.Menubar = L.Control.extend({
 				{name: _UNO('.uno:SelectBackground', 'presentation'), id: 'selectbackground', type: 'action'},
 				{name: _UNO('.uno:InsertAnnotation', 'presentation'), id: 'insertcomment', type: 'action'},
 				{uno: '.uno:InsertObjectChart'},
+				{name: _UNO('.uno:FontworkGalleryFloater'), uno: '.uno:FontworkGalleryFloater'},
 				{type: 'separator'},
 				{name: _UNO('.uno:HyperlinkDialog'), id: 'inserthyperlink', type: 'action'},
 				{type: 'separator'},
@@ -785,6 +787,7 @@ L.Control.Menubar = L.Control.extend({
 					{type: 'separator'},
 					{name: _UNO('.uno:HyperlinkDialog'), id: 'inserthyperlink', type: 'action'},
 					{name: _UNO('.uno:ShapesMenu'), id: 'insertshape', type: 'action'},
+					{name: _UNO('.uno:FontworkGalleryFloater'), uno: '.uno:FontworkGalleryFloater'},
 					{name: _UNO('.uno:FormattingMarkMenu', 'text'), id: 'formattingmark', type: 'menu', menu: [
 						{uno: '.uno:InsertNonBreakingSpace'},
 						{uno: '.uno:InsertHardHyphen'},
@@ -817,6 +820,7 @@ L.Control.Menubar = L.Control.extend({
 					{name: _UNO('.uno:TableMenu'), id: 'inserttable', type: 'action'},
 					{name: _UNO('.uno:HyperlinkDialog'), id: 'inserthyperlink', type: 'action'},
 					{name: _UNO('.uno:ShapesMenu'), id: 'insertshape', type: 'action'},
+					{name: _UNO('.uno:FontworkGalleryFloater'), uno: '.uno:FontworkGalleryFloater'},
 					{name: _UNO('.uno:Text', 'presentation'), id: 'inserttextbox', type: 'action'},
 					{name: _UNO('.uno:InsertField', 'text'), id: 'insertfield', type: 'menu', menu: [
 						{uno: '.uno:InsertDateFieldFix'},
@@ -1276,7 +1280,7 @@ L.Control.Menubar = L.Control.extend({
 				}
 			}
 		} else if (id === 'saveas') {
-			this._map.fire('postMessage', {msgId: 'UI_SaveAs'});
+			this._map.openSaveAs();
 		} else if (id === 'savecomments') {
 			if (this._map.isPermissionEditForComments()) {
 				this._map.fire('postMessage', {msgId: 'UI_Save'});
@@ -1285,7 +1289,7 @@ L.Control.Menubar = L.Control.extend({
 				}
 			}
 		} else if (id === 'shareas') {
-			this._map.fire('postMessage', {msgId: 'UI_Share'});
+			this._map.openShare();
 		} else if (id === 'print') {
 			this._map.print();
 		} else if (id.startsWith('downloadas-')) {
@@ -1355,10 +1359,7 @@ L.Control.Menubar = L.Control.extend({
 		} else if (id === 'keyboard-shortcuts' || id === 'online-help') {
 			this._map.showHelp(id);
 		} else if (L.Params.revHistoryEnabled && (id === 'rev-history' || id === 'last-mod')) {
-			// if we are being loaded inside an iframe, ask
-			// our host to show revision history mode
-			this._map.fire('postMessage', {msgId: 'rev-history', args: {Deprecated: true}});
-			this._map.fire('postMessage', {msgId: 'UI_FileVersions'});
+			this._map.openRevisionHistory();
 		} else if (id === 'closedocument') {
 			window.onClose();
 		} else if (id === 'repair') {

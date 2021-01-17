@@ -89,9 +89,9 @@ L.Control.NotebookbarCalc = L.Control.NotebookbarWriter.extend({
 							'children': [
 								{
 									'id': 'saveas',
-									'type': 'menubartoolitem',
+									'type': 'bigtoolitem',
 									'text': _UNO('.uno:SaveAs', 'spreadsheet'),
-									'command': ''
+									'command': '.uno:SaveAs'
 								}
 							]
 						} : {},
@@ -104,9 +104,9 @@ L.Control.NotebookbarCalc = L.Control.NotebookbarWriter.extend({
 							'children': [
 								{
 									'id': 'shareas',
-									'type': 'menubartoolitem',
-									'text': _('Share...'),
-									'command': ''
+									'type': 'bigtoolitem',
+									'text': _('Share'),
+									'command': '.uno:shareas'
 								}
 							]
 						} : {},
@@ -119,9 +119,9 @@ L.Control.NotebookbarCalc = L.Control.NotebookbarWriter.extend({
 							'children': [
 								{
 									'id': 'print',
-									'type': 'menubartoolitem',
+									'type': 'bigtoolitem',
 									'text': _UNO('.uno:Print', 'spreadsheet'),
-									'command': ''
+									'command': '.uno:Print'
 								}
 							]
 						} : {},
@@ -134,9 +134,9 @@ L.Control.NotebookbarCalc = L.Control.NotebookbarWriter.extend({
 							'children': [
 								{
 									'id': 'rev-history',
-									'type': 'menubartoolitem',
-									'text': _('See revision history'),
-									'command': ''
+									'type': 'bigtoolitem',
+									'text': _('See history'),
+									'command': '.uno:rev-history'
 								}
 							]
 						} : {},
@@ -2166,6 +2166,28 @@ L.Control.NotebookbarCalc = L.Control.NotebookbarWriter.extend({
 							}
 						],
 						'vertical': 'true'
+					}
+				],
+				'vertical': 'false'
+			},
+			{
+				'id': 'Insert-Section-Fontwork',
+				'type': 'container',
+				'text': '',
+				'enabled': 'true',
+				'children': [
+					{
+						'id': 'SectionBottom656',
+						'type': 'toolbox',
+						'text': '',
+						'enabled': 'true',
+						'children': [
+							{
+								'type': 'bigtoolitem',
+								'text': _UNO('.uno:FontworkGalleryFloater'),
+								'command': '.uno:FontworkGalleryFloater'
+							}
+						]
 					}
 				],
 				'vertical': 'false'

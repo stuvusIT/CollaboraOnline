@@ -47,6 +47,10 @@ L.Control.NotebookbarBuilder = L.Control.JSDialogBuilder.extend({
 		this._toolitemHandlers['.uno:SetDefault'] = this._clearFormattingControl;
 		this._toolitemHandlers['.uno:Presentation'] = this._startPresentationControl;
 		this._toolitemHandlers['.uno:Save'] = this._saveControl;
+		this._toolitemHandlers['.uno:SaveAs'] = this._saveAsControl;
+		this._toolitemHandlers['.uno:shareas'] = this._shareAsControl;
+		this._toolitemHandlers['.uno:Print'] = this._printControl;
+		this._toolitemHandlers['.uno:rev-history'] = this._revHistoryControl;
 		this._toolitemHandlers['.uno:Menubar'] = this._menubarControl;
 		this._toolitemHandlers['.uno:InsertPageHeader'] = this._headerFooterControl;
 		this._toolitemHandlers['.uno:InsertPageFooter'] = this._headerFooterControl;
@@ -107,7 +111,6 @@ L.Control.NotebookbarBuilder = L.Control.JSDialogBuilder.extend({
 		this._toolitemHandlers['.uno:ConnectorToolbox'] = function() {};
 		this._toolitemHandlers['.uno:PresentationCurrentSlide'] = function() {};
 		this._toolitemHandlers['.uno:PresentationLayout'] = function() {};
-		this._toolitemHandlers['.uno:FontworkGalleryFloater'] = function() {};
 		this._toolitemHandlers['.uno:CapturePoint'] = function() {};
 		this._toolitemHandlers['.uno:Objects3DToolbox'] = function() {};
 		this._toolitemHandlers['.uno:InsertMath'] = function() {};
@@ -599,15 +602,25 @@ L.Control.NotebookbarBuilder = L.Control.JSDialogBuilder.extend({
 
 		$(control.container).unbind('click');
 		$(control.container).click(function () {
+			var isChecked = function(command) {
+				var items = builder.map['stateChangeHandler'];
+				var val = items.getItemValue(command);
+				if (val && (val === 'true' || val === true))
+					return true;
+				else
+					return false;
+			};
+
 			$(control.container).w2menu({
 				items: [
-					{id: 'spacepara1', text: _UNO('.uno:SpacePara1'), uno: 'SpacePara1'},
-					{id: 'spacepara15', text: _UNO('.uno:SpacePara15'), uno: 'SpacePara15'},
-					{id: 'spacepara2', text: _UNO('.uno:SpacePara2'), uno: 'SpacePara2'},
+					{id: 'spacepara1', text: _UNO('.uno:SpacePara1'), uno: 'SpacePara1', checked: isChecked('.uno:SpacePara1')},
+					{id: 'spacepara15', text: _UNO('.uno:SpacePara15'), uno: 'SpacePara15', checked: isChecked('.uno:SpacePara15')},
+					{id: 'spacepara2', text: _UNO('.uno:SpacePara2'), uno: 'SpacePara2', checked: isChecked('.uno:SpacePara2')},
 					{type: 'break'},
 					{id: 'paraspaceincrease', text: _UNO('.uno:ParaspaceIncrease'), uno: 'ParaspaceIncrease'},
 					{id: 'paraspacedecrease', text: _UNO('.uno:ParaspaceDecrease'), uno: 'ParaspaceDecrease'}
 				],
+				type: 'radio',
 				onSelect: function (event) {
 					builder.map.sendUnoCommand('.uno:' + event.item.uno);
 				}
@@ -645,6 +658,42 @@ L.Control.NotebookbarBuilder = L.Control.JSDialogBuilder.extend({
 					builder.map.save(false, false);
 				}
 			}
+		});
+	},
+
+	_saveAsControl: function(parentContainer, data, builder) {
+		var control = builder._unoToolButton(parentContainer, data, builder);
+
+		$(control.container).unbind('click');
+		$(control.container).click(function () {
+			builder.map.openSaveAs();
+		});
+	},
+
+	_shareAsControl: function(parentContainer, data, builder) {
+		var control = builder._unoToolButton(parentContainer, data, builder);
+
+		$(control.container).unbind('click');
+		$(control.container).click(function () {
+			builder.map.openShare();
+		});
+	},
+
+	_printControl: function(parentContainer, data, builder) {
+		var control = builder._unoToolButton(parentContainer, data, builder);
+
+		$(control.container).unbind('click');
+		$(control.container).click(function () {
+			builder.map.print();
+		});
+	},
+
+	_revHistoryControl: function(parentContainer, data, builder) {
+		var control = builder._unoToolButton(parentContainer, data, builder);
+
+		$(control.container).unbind('click');
+		$(control.container).click(function () {
+			builder.map.openRevisionHistory();
 		});
 	},
 

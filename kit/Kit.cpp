@@ -528,7 +528,6 @@ public:
         _isDocPasswordProtected(false),
         _docPasswordType(PasswordType::ToView),
         _stop(false),
-        _isLoading(0),
         _editorId(-1),
         _editorChangeWarning(false),
         _mobileAppDocId(mobileAppDocId),
@@ -582,8 +581,6 @@ public:
 
     bool createSession(const std::string& sessionId, int canonicalViewId)
     {
-        std::unique_lock<std::mutex> lock(_mutex);
-
         try
         {
             if (_sessions.find(sessionId) != _sessions.end())
@@ -625,13 +622,6 @@ public:
         std::vector<std::shared_ptr<ChildSession>> deadSessions;
         std::size_t num_sessions = 0;
         {
-            std::unique_lock<std::mutex> lock(_mutex, std::defer_lock);
-            if (!lock.try_lock())
-            {
-                // Not a good time, try later.
-                return -1;
-            }
-
             // If there are no live sessions, we don't need to do anything at all and can just
             // bluntly exit, no need to clean up our own data structures. Also, there is a bug that
             // causes the deadSessions.clear() call below to crash in some situations when the last
@@ -660,10 +650,6 @@ public:
 #endif
         }
 
-        // Don't destroy sessions while holding our lock.
-        // We may deadlock if a session is waiting on us
-        // during callback initiated while handling a command
-        // and the dtor tries to take its lock (which is taken).
         deadSessions.clear();
 
         return num_sessions;
@@ -944,14 +930,8 @@ private:
                 const std::string& renderOpts,
                 const std::string& docTemplate) override
     {
-        std::unique_lock<std::mutex> lock(_mutex);
-
         LOG_INF("Loading url [" << uriAnonym << "] for session [" << sessionId <<
-                "] which has " << (_sessions.size() - 1) <<
-                " sessions. Another load in progress: " << _isLoading);
-
-        while (_isLoading)
-            _cvLoading.wait(lock);
+                "] which has " << (_sessions.size() - 1) << " sessions.");
 
         // This shouldn't happen, but for sanity.
         const auto it = _sessions.find(sessionId);
@@ -962,18 +942,6 @@ private:
         }
 
         std::shared_ptr<ChildSession> session = it->second;
-
-        // Flag and release lock.
-        ++_isLoading;
-
-        Util::ScopeGuard g([this]() {
-            // Not loading.
-            --_isLoading;
-            _cvLoading.notify_one();
-        });
-
-        lock.unlock();
-
         try
         {
             if (!load(session, renderOpts, docTemplate))
@@ -1010,7 +978,6 @@ private:
         int viewCount = _loKitDocument->getViewsCount();
         if (viewCount == 1)
         {
-            std::unique_lock<std::mutex> lock(_mutex);
 #if !MOBILEAPP
             if (_sessions.empty())
             {
@@ -1052,14 +1019,7 @@ private:
 
     std::map<int, UserInfo> getViewInfo() override
     {
-        std::unique_lock<std::mutex> lock(_mutex);
-
         return _sessionUserInfo;
-    }
-
-    std::mutex& getMutex() override
-    {
-        return _mutex;
     }
 
     std::shared_ptr<TileQueue>& getTileQueue() override
@@ -1389,8 +1349,6 @@ private:
         std::string sessionId;
         if (LOOLProtocol::parseNameValuePair(prefix, name, sessionId, '-') && name == "child")
         {
-            std::unique_lock<std::mutex> lock(_mutex);
-
             const auto it = _sessions.find(sessionId);
             if (it != _sessions.end())
             {
@@ -1414,13 +1372,11 @@ private:
                             " after removing ChildSession [" << sessionId << "].");
 
                     // No longer needed, and allow session dtor to take it.
-                    lock.unlock();
                     session.reset();
                     return true;
                 }
 
                 // No longer needed, and allow the handler to take it.
-                lock.unlock();
                 if (session)
                 {
                     std::vector<char> vect(size);
@@ -1664,7 +1620,6 @@ public:
     {
         oss << "Kit Document:\n"
             << "\n\tstop: " << _stop
-            << "\n\tisLoading: " << _isLoading
             << "\n\tjailId: " << _jailId
             << "\n\tdocKey: " << _docKey
             << "\n\tdocId: " << _docId
@@ -1727,12 +1682,10 @@ private:
     PasswordType _docPasswordType;
 
     std::atomic<bool> _stop;
-    mutable std::mutex _mutex;
 
     ThreadPool _pngPool;
 
     std::condition_variable _cvLoading;
-    std::atomic_size_t _isLoading;
     int _editorId;
     bool _editorChangeWarning;
     std::map<int, std::unique_ptr<CallbackDescriptor>> _viewIdToCallbackDescr;

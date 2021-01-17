@@ -333,6 +333,33 @@ input[type='checkbox']:checked.autofilter, .jsdialog input[type='checkbox']:chec
 	float: left;
 }
 
+/* Icon View */
+
+.ui-iconview {
+	overflow: scroll;
+	display: inline-flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+}
+
+.ui-iconview.mobile-wizard {
+	justify-content: space-around;
+}
+
+.ui-iconview-entry {
+	float: left;
+	position: relative;
+	display: flex;
+	flex-direction: row;
+	align-self: center;
+	border: 2px solid transparent;
+	border-radius: 3px;
+}
+
+.ui-iconview-entry.selected {
+	border: 2px solid gray;
+}
+
 /* Autofilter dropdown */
 
 .autofilter.row {
@@ -491,4 +518,14 @@ input[type='checkbox']:checked.autofilter, .jsdialog input[type='checkbox']:chec
 
 #hideitems {
 	border: none;
+}
+
+/* Fontwork dialog */
+
+#FontworkGalleryDialog #ctlFavoriteswin {
+	max-width: 400px;
+	max-height: 400px;
+}
+#FontworkGalleryDialog #label1 {
+	display: none;
 }

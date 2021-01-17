@@ -88,6 +88,7 @@ class CanvasSectionObject {
 	position: Array<number> = new Array(0);
 	size: Array<number> = new Array(0);
 	expand: Array<string> = new Array(0);
+	isLocated: boolean = false; // location and size of the section computed yet ?
 	processingOrder: number = null;
 	drawingOrder: number = null;
 	zIndex: number = null;
@@ -495,6 +496,7 @@ class CanvasSectionContainer {
 		this.bottom = this.canvas.height;
 		for (var i: number = 0; i < this.sections.length; i++) {
 			this.sections[i].dpiScale = this.dpiScale;
+			this.sections[i].isLocated = false;
 		}
 
 		this.reNewAllSections();
@@ -543,6 +545,9 @@ class CanvasSectionContainer {
 	private hitLeft (section: CanvasSectionObject): number {
 		var maxX = -1;
 		for (var i: number = 0; i < this.sections.length; i++) {
+			if (!this.sections[i].isLocated)
+				continue;
+
 			if (this.sections[i].zIndex === section.zIndex && this.sections[i].name !== section.name) {
 				var currentLeft = this.sections[i].myTopLeft[0] + this.sections[i].size[0];
 				if (currentLeft > maxX && currentLeft < section.myTopLeft[0]) {
@@ -562,6 +567,9 @@ class CanvasSectionContainer {
 	private hitRight (section: CanvasSectionObject): number {
 		var minX = Infinity;
 		for (var i: number = 0; i < this.sections.length; i++) {
+			if (!this.sections[i].isLocated)
+				continue;
+
 			if (this.sections[i].zIndex === section.zIndex && this.sections[i].name !== section.name) {
 				var currentRight = this.sections[i].myTopLeft[0];
 				if (currentRight < minX && currentRight > section.myTopLeft[0]) {
@@ -582,6 +590,9 @@ class CanvasSectionContainer {
 	private hitTop (section: CanvasSectionObject): number {
 		var maxY = -1;
 		for (var i: number = 0; i < this.sections.length; i++) {
+			if (!this.sections[i].isLocated)
+				continue;
+
 			if (this.sections[i].zIndex === section.zIndex && this.sections[i].name !== section.name) {
 				var currentTop =  this.sections[i].myTopLeft[1] + this.sections[i].size[1];
 				if (currentTop > maxY && currentTop < section.myTopLeft[1]) {
@@ -601,6 +612,9 @@ class CanvasSectionContainer {
 	private hitBottom (section: CanvasSectionObject): number {
 		var minY = Infinity;
 		for (var i: number = 0; i < this.sections.length; i++) {
+			if (!this.sections[i].isLocated)
+				continue;
+
 			if (this.sections[i].zIndex === section.zIndex && this.sections[i].name !== section.name) {
 				var currentBottom =  this.sections[i].myTopLeft[1];
 				if (currentBottom < minY && currentBottom > section.myTopLeft[1]) {
@@ -630,6 +644,9 @@ class CanvasSectionContainer {
 	private locateSections () {
 		for (var i: number = 0; i < this.sections.length; i++) {
 			var section: CanvasSectionObject = this.sections[i];
+			if (section.isLocated)
+				continue;
+
 			section.myTopLeft = null;
 			var x = section.anchor[1] === 'left' ? section.position[0]: (this.right - (section.position[0] + section.size[0]));
 			var y = section.anchor[0] === 'top' ? section.position[1]: (this.bottom - (section.position[1] + section.size[1]));
@@ -650,6 +667,9 @@ class CanvasSectionContainer {
 		// We have initial positions, now we'll expand them.
 		for (var i: number = 0; i < this.sections.length; i++) {
 			var section: CanvasSectionObject = this.sections[i];
+			if (section.isLocated)
+				continue;
+
 			if (section.expand && !section.boundToSection) {
 				if (section.expand.includes('left')) {
 					var initialX = section.myTopLeft[0];
@@ -670,12 +690,19 @@ class CanvasSectionContainer {
 				if (section.expand.includes('bottom')) {
 					section.size[1] = this.hitBottom(section) - section.myTopLeft[1];
 				}
+
+				section.isLocated = true;
 			}
+			else if (!section.boundToSection)
+				section.isLocated = true; // expand is empty => its location/size is already defined.
 		}
 
 		// Set location and size of bound sections.
 		for (var i: number = 0; i < this.sections.length; i++) {
 			var section: CanvasSectionObject = this.sections[i];
+			if (section.isLocated)
+				continue;
+
 			if (section.boundToSection) {
 				var parentSection = this.getSectionWithName(section.boundToSection);
 				if (parentSection) {
@@ -684,6 +711,8 @@ class CanvasSectionContainer {
 					section.myTopLeft[0] = parentSection.myTopLeft[0];
 					section.myTopLeft[1] = parentSection.myTopLeft[1];
 				}
+
+				section.isLocated = true; // FIXME: do only if parentSection is available ?
 			}
 		}
 	}

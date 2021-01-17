@@ -30,7 +30,9 @@
 #include <Util.hpp>
 
 #include <net/Socket.hpp>
-#include <net/SslSocket.hpp>
+#if ENABLE_SSL
+#include <SslSocket.hpp>
+#endif
 #include <net/WebSocketHandler.hpp>
 
 #include <common/SigUtil.hpp>
@@ -726,7 +728,7 @@ void Admin::notifyForkit()
 void Admin::triggerMemoryCleanup(const size_t totalMem)
 {
     // Trigger mem cleanup when we are consuming too much memory (as configured by sysadmin)
-    const auto memLimit = LOOLWSD::getConfigValue<double>("memproportion", 0.0);
+    static const double memLimit = LOOLWSD::getConfigValue<double>("memproportion", 0.0);
     if (memLimit == 0.0 || _totalSysMemKb == 0)
     {
         LOG_TRC("Total memory consumed: " << totalMem <<
