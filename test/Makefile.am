@@ -88,6 +88,7 @@ unittest_SOURCES = \
     ../common/SigUtil.cpp \
     ../common/Unit.cpp \
     ../common/StringVector.cpp \
+    ../net/HttpRequest.cpp \
     ../net/Socket.cpp \
     ../net/NetUtil.cpp \
     ../wsd/Auth.cpp \
@@ -108,7 +109,7 @@ fakesockettest_SOURCES = fakesockettest.cpp  ../net/FakeSocket.cpp ../common/Log
 fakesockettest_LDADD = $(CPPUNIT_LIBS)
 
 # old-style unit tests - bootstrapped via UnitClient
-unit_base_la_SOURCES = UnitClient.cpp ${test_base_source}
+unit_base_la_SOURCES = UnitClient.cpp ${test_base_source} HttpRequestTests.cpp
 unit_tiletest_la_SOURCES = UnitClient.cpp TileCacheTests.cpp
 unit_tiletest_la_LIBADD = $(CPPUNIT_LIBS)
 unit_integration_la_SOURCES = UnitClient.cpp integration-http-server.cpp
@@ -289,7 +290,7 @@ unit-timeout.log : group0.log
 unit-wopi-httpheaders.log: group0.log
 unit-base.log: group0.log
 
-group1.log: unit-crash.log unit-tiletest.log unit-insert-delete.log unit-each-view.log unit-httpws.log unit-close.log unit-wopi-documentconflict.log unit-prefork.log unit-wopi-versionrestore.log unit-wopi-temp.log unit_wopi_renamefile.log unit_wopi_watermark.log unit-wopi.log unit-wopi-ownertermination.log unit-load-torture.log unit-wopi-saveas.log unit-password-protected.log unit-http.log unit-tiff-load.log unit-render-shape.log unit-oauth.log unit-large-paste.log unit-paste.log unit-rendering-options.log unit-session.log unit-uno-command.log unit-load.log unit-cursor.log unit-calc.log unit-bad-doc-load.log unit-hosting.log unit-wopi-loadencoded.log unit-integration.log unit-convert.log unit-typing.log unit-tilecache.log unit-timeout.log unit-base.log unit-wopi-httpheaders.log
+group1.log: unit-tiletest.log unit-crash.log unit-insert-delete.log unit-each-view.log unit-httpws.log unit-close.log unit-wopi-documentconflict.log unit-prefork.log unit-wopi-versionrestore.log unit-wopi-temp.log unit_wopi_renamefile.log unit_wopi_watermark.log unit-wopi.log unit-wopi-ownertermination.log unit-load-torture.log unit-wopi-saveas.log unit-password-protected.log unit-http.log unit-tiff-load.log unit-render-shape.log unit-oauth.log unit-large-paste.log unit-paste.log unit-rendering-options.log unit-session.log unit-uno-command.log unit-load.log unit-cursor.log unit-calc.log unit-bad-doc-load.log unit-hosting.log unit-wopi-loadencoded.log unit-integration.log unit-convert.log unit-typing.log unit-tilecache.log unit-timeout.log unit-base.log unit-wopi-httpheaders.log
 	$(CLEANUP_COMMAND)
 	touch $@
 

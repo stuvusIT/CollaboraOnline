@@ -20,6 +20,7 @@ L.Control.MobileWizardBuilder = L.Control.JSDialogBuilder.extend({
 		this._controlHandlers['checkbox'] = this._checkboxControl;
 		this._controlHandlers['basespinfield'] = this.baseSpinField;
 		this._controlHandlers['radiobutton'] = this._radiobuttonControl;
+		this._controlHandlers['edit'] = this._editControl;
 	},
 
 	baseSpinField: function(parentContainer, data, builder, customCallback) {
@@ -206,7 +207,7 @@ L.Control.MobileWizardBuilder = L.Control.JSDialogBuilder.extend({
 		var checkbox = L.DomUtil.createWithId('input', data.id, div);
 		checkbox.type = 'checkbox';
 
-		if (data.enabled == 'false') {
+		if (data.enabled === 'false' || data.enabled === false) {
 			$(checkboxLabel).addClass('disabled');
 			$(checkbox).attr('disabled', 'disabled');
 		}
@@ -227,7 +228,7 @@ L.Control.MobileWizardBuilder = L.Control.JSDialogBuilder.extend({
 			if (!state)
 				state = data.checked;
 
-			if (state && state === 'true' || state === 1 || state === '1')
+			if (state && state === 'true' || state === true || state === 1 || state === '1')
 				$(checkbox).prop('checked', true);
 			else if (state)
 				$(checkbox).prop('checked', false);
@@ -274,6 +275,36 @@ L.Control.MobileWizardBuilder = L.Control.JSDialogBuilder.extend({
 
 		if (data.hidden)
 			$(radiobutton).hide();
+
+		return false;
+	},
+
+	_editControl: function(parentContainer, data, builder, callback) {
+		var edit = L.DomUtil.create('input', 'ui-edit ' + builder.options.cssClass, parentContainer);
+		edit.value = builder._cleanText(data.text);
+		edit.id = data.id;
+
+		if (data.enabled === 'false' || data.enabled === false)
+			$(edit).prop('disabled', true);
+
+		// we still use non welded sidebar where don't have partial updates
+		// kayup can be used only in welded dialogs
+		edit.addEventListener('change', function() {
+			if (callback)
+				callback(this.value);
+			else
+				builder.callback('edit', 'change', edit, this.value, builder);
+		});
+
+		edit.addEventListener('click', function(e) {
+			e.stopPropagation();
+		});
+
+		if (data.hidden)
+			$(edit).hide();
+
+		if (data.placeholder)
+			$(edit).attr('placeholder', data.placeholder);
 
 		return false;
 	},

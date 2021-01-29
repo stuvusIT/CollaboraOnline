@@ -63,6 +63,8 @@ L.TileLayer = L.GridLayer.extend({
 		marginY: 10
 	},
 
+	_pngCache: [],
+
 	initialize: function (url, options) {
 
 		this._url = url;
@@ -168,6 +170,22 @@ L.TileLayer = L.GridLayer.extend({
 		});
 
 		this._cellResizeMarkerEnd = L.marker(new L.LatLng(0, 0), {
+			icon: L.divIcon({
+				className: 'spreadsheet-cell-resize-marker',
+				iconSize: null
+			}),
+			draggable: true
+		});
+
+		this._referenceMarkerStart = L.marker(new L.LatLng(0, 0), {
+			icon: L.divIcon({
+				className: 'spreadsheet-cell-resize-marker',
+				iconSize: null
+			}),
+			draggable: true
+		});
+
+		this._referenceMarkerEnd = L.marker(new L.LatLng(0, 0), {
 			icon: L.divIcon({
 				className: 'spreadsheet-cell-resize-marker',
 				iconSize: null
@@ -353,6 +371,8 @@ L.TileLayer = L.GridLayer.extend({
 
 		this._cellResizeMarkerStart.on('dragstart drag dragend', this._onCellResizeMarkerDrag, this);
 		this._cellResizeMarkerEnd.on('dragstart drag dragend', this._onCellResizeMarkerDrag, this);
+		this._referenceMarkerStart.on('dragstart drag dragend', this._onReferenceMarkerDrag, this);
+		this._referenceMarkerEnd.on('dragstart drag dragend', this._onReferenceMarkerDrag, this);
 		this._cellAutofillMarker.on('dragstart drag dragend', this._onCellResizeMarkerDrag, this);
 		this._dropDownButton.on('click', this._onDropDownButtonClick, this);
 		// The 'tap' events are not broadcasted by L.Map.TouchGesture, A specialized 'dropdownmarkertapped' event is
@@ -942,6 +962,7 @@ L.TileLayer = L.GridLayer.extend({
 	_onCursorVisibleMsg: function(textMsg) {
 		var command = textMsg.match('cursorvisible: true');
 		this._map._isCursorVisible = command ? true : false;
+		this._removeSelection();
 		this._onUpdateCursor();
 	},
 
@@ -1217,7 +1238,6 @@ L.TileLayer = L.GridLayer.extend({
 
 		// Remove input help if there is any:
 		this._removeInputHelpMarker();
-		this._removeSelection();
 	},
 
 	_removeInputHelpMarker: function() {
@@ -1272,13 +1292,10 @@ L.TileLayer = L.GridLayer.extend({
 
 	_movePopUpBelow: function() {
 		var popUp = $('.hyperlink-popup').first();
-		var pixBounds = L.bounds(this._map.latLngToLayerPoint(this._visibleCursor.getSouthWest()),
-			this._map.latLngToLayerPoint(this._visibleCursor.getNorthEast()));
-		var cursorSize = pixBounds.getSize().multiplyBy(this._map.getZoomScale(this._map.getZoom()));
-		var bottom = cursorSize.y + popUp.height();
+		var bottom = parseInt(popUp.css('bottom')) - popUp.height();
 
 		popUp.css({
-			'bottom': bottom ? -bottom + 'px': '',
+			'bottom': bottom ? bottom + 'px': '',
 			'display': 'flex',
 			'flex-direction': 'column-reverse'
 		});
@@ -1288,7 +1305,7 @@ L.TileLayer = L.GridLayer.extend({
 	_movePopUpRight: function() {
 		$('.leaflet-popup-content-wrapper').first().css({
 			'position': 'relative',
-			'left': this._map.hyperlinkPopup._containerLeft * -1
+			'left': (this._map.hyperlinkPopup._containerWidth / 2)
 		});
 		$('.leaflet-popup-tip-container').first().css({
 			'left': '25px'
@@ -1461,7 +1478,7 @@ L.TileLayer = L.GridLayer.extend({
 		var cellViewCursorMarker = this._cellViewCursors[viewId].marker;
 		var viewPart = this._cellViewCursors[viewId].part;
 
-		if (!this._isEmptyRectangle(this._cellViewCursors[viewId].bounds) && this._selectedPart === viewPart) {
+		if (!this._isEmptyRectangle(this._cellViewCursors[viewId].bounds) && this._selectedPart === viewPart && this._map.hasInfoForView(viewId)) {
 			if (!cellViewCursorMarker) {
 				var backgroundColor = L.LOUtil.rgbToHex(this._map.getViewColor(viewId));
 				cellViewCursorMarker = L.rectangle(this._cellViewCursors[viewId].bounds, {fill: false, color: backgroundColor, weight: 2});
@@ -1812,6 +1829,25 @@ L.TileLayer = L.GridLayer.extend({
 				&& this._selectedPart === this._referencesAll[i].part) {
 				this._references.addLayer(this._referencesAll[i].mark);
 			}
+			if (!window.mode.isDesktop()) {
+				if (!this._referenceMarkerStart.isDragged) {
+					this._map.addLayer(this._referenceMarkerStart);
+					var sizeStart = this._referenceMarkerStart._icon.getBoundingClientRect();
+					var posStart = this._map.project(this._referencesAll[i].mark._bounds.getNorthWest());
+					posStart = posStart.subtract(new L.Point(sizeStart.width / 2, sizeStart.height / 2));
+					posStart = this._map.unproject(posStart);
+					this._referenceMarkerStart.setLatLng(posStart);
+				}
+
+				if (!this._referenceMarkerEnd.isDragged) {
+					this._map.addLayer(this._referenceMarkerEnd);
+					var sizeEnd = this._referenceMarkerEnd._icon.getBoundingClientRect();
+					var posEnd = this._map.project(this._referencesAll[i].mark._bounds.getSouthEast());
+					posEnd = posEnd.subtract(new L.Point(sizeEnd.width / 2, sizeEnd.height / 2));
+					posEnd = this._map.unproject(posEnd);
+					this._referenceMarkerEnd.setLatLng(posEnd);
+				}
+			}
 		}
 	},
 
@@ -1966,12 +2002,61 @@ L.TileLayer = L.GridLayer.extend({
 	_onDialogPaintMsg: function(textMsg, img) {
 		var command = this._map._socket.parseServerCmd(textMsg);
 
+		// this._map._socket.sendMessage('DEBUG _onDialogPaintMsg: hash=' + command.hash + ' img=' + typeof(img) + (typeof(img) == 'string' ? (' (length:' + img.length + ':"' + img.substring(0, 30) + (img.length > 30 ? '...' : '') + '")') : '') + ', cache size ' + this._pngCache.length);
+		if (command.nopng) {
+			var found = false;
+			for (var i = 0; i < this._pngCache.length; i++) {
+				if (this._pngCache[i].hash == command.hash) {
+					found = true;
+					// this._map._socket.sendMessage('DEBUG - Found in cache');
+					img = this._pngCache[i].img;
+					// Remove item (and add it below at the start of the array)
+					this._pngCache.splice(i, 1);
+					break;
+				}
+			}
+			if (!found) {
+				var message = 'windowpaint: message assumed PNG for hash ' + command.hash
+				    + ' is cached here in the client but not found';
+				if (L.Browser.cypressTest)
+					throw message;
+				this._map._socket.sendMessage('ERROR ' + message);
+				// Not sure what to do. Ask the server to re-send the windowpaint: message but this time including the PNG?
+			}
+		} else {
+			// Sanity check: If we get a PNG it should be for a hash that we don't have cached
+			for (i = 0; i < this._pngCache.length; i++) {
+				if (this._pngCache[i].hash == command.hash) {
+					var message = 'windowpaint: message included PNG for hash ' + command.hash
+					    + ' even if it was already cached here in the client';
+					if (L.Browser.cypressTest)
+						throw message;
+					this._map._socket.sendMessage('ERROR ' + message);
+					// Remove the extra copy, code below will add it at the start of the array
+					this._pngCache.splice(i, 1);
+					break;
+				}
+			}
+		}
+
+		// If cache is max size, drop the last element
+		if (this._pngCache.length == this._map._socket.TunnelledDialogImageCacheSize) {
+			// this._map._socket.sendMessage('DEBUG - Dropping last cache element');
+			this._pngCache.pop();
+		}
+
+		// Add element to cache
+		this._pngCache.unshift({hash: command.hash, img:img});
+
+		// this._map._socket.sendMessage('DEBUG - Cache size now ' + this._pngCache.length);
+
 		this._map.fire('windowpaint', {
 			id: command.id,
 			img: img,
 			width: command.width,
 			height: command.height,
-			rectangle: command.rectangle
+			rectangle: command.rectangle,
+			hash: command.hash
 		});
 	},
 
@@ -2197,6 +2282,11 @@ L.TileLayer = L.GridLayer.extend({
 
 	_clearReferences: function () {
 		this._references.clearLayers();
+
+		if (!this._referenceMarkerStart.isDragged)
+			this._map.removeLayer(this._referenceMarkerStart);
+		if (!this._referenceMarkerEnd.isDragged)
+			this._map.removeLayer(this._referenceMarkerEnd);
 	},
 
 	_postMouseEvent: function(type, x, y, count, buttons, modifier) {
@@ -2314,10 +2404,17 @@ L.TileLayer = L.GridLayer.extend({
 		}
 	},
 
+	_allowViewJump: function() {
+		return (!this._map._clip || this._map._clip._selectionType !== 'complex') &&
+		!this._referenceMarkerStart.isDragged && !this._referenceMarkerEnd.isDragged;
+	},
+
 	// Update cursor layer (blinking cursor).
 	_onUpdateCursor: function (scroll, zoom) {
 
-		if (!this._visibleCursor) {
+		if (!this._visibleCursor ||
+			this._referenceMarkerStart.isDragged ||
+			this._referenceMarkerEnd.isDragged) {
 			return;
 		}
 
@@ -2327,7 +2424,7 @@ L.TileLayer = L.GridLayer.extend({
 		if (!zoom
 		&& scroll !== false
 		&& this._map._isCursorVisible
-		&& (!this._map._clip || this._map._clip._selectionType !== 'complex')) {
+		&& this._allowViewJump()) {
 
 			var paneRectsInLatLng = this.getPaneLatLngRectangles();
 
@@ -2968,6 +3065,41 @@ L.TileLayer = L.GridLayer.extend({
 		}
 	},
 
+	_onReferenceMarkerDrag: function(e) {
+		if (e.type === 'dragstart') {
+			e.target.isDragged = true;
+			window.IgnorePanning = true;
+		}
+		else if (e.type === 'drag') {
+			var startPos = this._map.project(this._referenceMarkerStart.getLatLng());
+			var startSize = this._referenceMarkerStart._icon.getBoundingClientRect();
+			startPos = startPos.add(new L.Point(startSize.width, startSize.height));
+			var start = this.sheetGeometry.getCellFromPos(this._latLngToTwips(this._map.unproject(startPos)), 'tiletwips');
+
+			var endPos = this._map.project(this._referenceMarkerEnd.getLatLng());
+			var endSize = this._referenceMarkerEnd._icon.getBoundingClientRect();
+			endPos = endPos.subtract(new L.Point(endSize.width / 2, endSize.height / 2));
+			var end = this.sheetGeometry.getCellFromPos(this._latLngToTwips(this._map.unproject(endPos)), 'tiletwips');
+
+			this._sendReferenceRangeCommand(start.x, start.y, end.x, end.y);
+		}
+		else if (e.type === 'dragend') {
+			e.target.isDragged = false;
+			window.IgnorePanning = undefined;
+			this._updateReferenceMarks();
+		}
+	},
+
+	_sendReferenceRangeCommand: function(startCol, startRow, endCol, endRow) {
+		this._map.sendUnoCommand(
+			'.uno:CurrentFormulaRange?StartCol=' + startCol +
+			'&StartRow=' + startRow +
+			'&EndCol=' + endCol +
+			'&EndRow=' + endRow +
+			'&Table=' + this._map._docLayer._selectedPart
+		);
+	},
+
 	_onDropDownButtonClick: function () {
 		if (this._validatedCellXY && this._cellCursorXY && this._validatedCellXY.equals(this._cellCursorXY)) {
 			this._map.sendUnoCommand('.uno:DataSelect');
@@ -3251,6 +3383,7 @@ L.TileLayer = L.GridLayer.extend({
 			this._updateMarkers();
 		}
 		else {
+			this._updateMarkers();
 			this._removeSelection();
 		}
 	},
@@ -3267,6 +3400,8 @@ L.TileLayer = L.GridLayer.extend({
 	},
 
 	_updateMarkers: function() {
+		if (!this._map._isCursorVisible)
+			return;
 		var startMarker = this._selectionHandles['start'];
 		var endMarker = this._selectionHandles['end'];
 

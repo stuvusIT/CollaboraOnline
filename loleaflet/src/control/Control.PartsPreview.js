@@ -219,8 +219,9 @@ L.Control.PartsPreview = L.Control.extend({
 				var partId = parseInt(part) - 1; // The first part is just a drop-site for reordering.
 			if (!window.mode.isDesktop() && partId === this._map._docLayer._selectedPart) {
 				// if mobile or tab then second tap will open the mobile wizard
-				if (this._map.isPermissionEdit()) {
-					this._setPart(e);
+				if (this._map._permission === 'edit') {
+					// Remove selection to get the slide properties in mobile wizard.
+					this._map._socket.sendMessage('resetselection');
 					setTimeout(function () {
 						w2ui['actionbar'].click('mobile_wizard');
 					}, 0);

@@ -330,7 +330,12 @@ bool ClientSession::_handleInput(const char *buffer, int length)
 
     if (tokens.equals(0, "DEBUG"))
     {
-        std::cerr << std::string(buffer, length).substr(strlen("DEBUG") + 1) << std::endl;
+        LOG_DBG("From client: " << std::string(buffer, length).substr(strlen("DEBUG") + 1));
+        return false;
+    }
+    else if (tokens.equals(0, "ERROR"))
+    {
+        LOG_ERR("From client: " << std::string(buffer, length).substr(strlen("ERROR") + 1));
         return false;
     }
 
@@ -516,7 +521,7 @@ bool ClientSession::_handleInput(const char *buffer, int length)
         // The savetostorage command is really only used to resolve save conflicts
         // and it seems to always have force=1. However, we should still honor the
         // contract and do as told, not as we expect the API to be used. Use force if provided.
-        docBroker->saveToStorage(getId(), true, "" /* This is irrelevant when success is true*/, force);
+        docBroker->uploadToStorage(getId(), true, "" /* This is irrelevant when success is true*/, force);
     }
     else if (tokens.equals(0, "clientvisiblearea"))
     {
@@ -682,7 +687,7 @@ bool ClientSession::_handleInput(const char *buffer, int length)
         }
         std::string wopiFilename;
         Poco::URI::decode(encodedWopiFilename, wopiFilename);
-        docBroker->saveAsToStorage(getId(), "", wopiFilename, true);
+        docBroker->uploadAsToStorage(getId(), "", wopiFilename, true);
         return true;
     }
     else if (tokens.equals(0, "dialogevent") || tokens.equals(0, "formfieldevent"))
@@ -776,8 +781,7 @@ bool ClientSession::loadDocument(const char* /*buffer*/, int /*length*/,
         parseDocOptions(tokens, loadPart, timestamp, doctemplate);
 
         std::ostringstream oss;
-        oss << "load";
-        oss << " url=" << docBroker->getPublicUri().toString();;
+        oss << "load url=" << docBroker->getPublicUri().toString();
 
         if (!getUserId().empty() && !getUserName().empty())
         {
@@ -1143,7 +1147,7 @@ bool ClientSession::handleKitToClientMessage(const char* buffer, const int lengt
                 }
 
                 // Save to Storage and log result.
-                docBroker->saveToStorage(getId(), success, result, /*force=*/false);
+                docBroker->uploadToStorage(getId(), success, result, /*force=*/false);
 
                 if (!isCloseFrame())
                     forwardToClient(payload);
@@ -1300,7 +1304,7 @@ bool ClientSession::handleKitToClientMessage(const char* buffer, const int lengt
             {
                 // this also sends the saveas: result
                 LOG_TRC("Save-as path: " << resultURL.getPath());
-                docBroker->saveAsToStorage(getId(), resultURL.getPath(), wopiFilename, false);
+                docBroker->uploadAsToStorage(getId(), resultURL.getPath(), wopiFilename, false);
             }
             else
                 sendTextFrameAndLogError("error: cmd=storage kind=savefailed");
@@ -1343,7 +1347,7 @@ bool ClientSession::handleKitToClientMessage(const char* buffer, const int lengt
             // When the document is saved internally, but saving to storage failed,
             // don't update the client's modified status
             // (otherwise client thinks document is unmodified b/c saving was successful)
-            if (!docBroker->isLastStorageSaveSuccessful())
+            if (!docBroker->isLastStorageUploadSuccessful())
                 return false;
 
             docBroker->setModified(stateTokens.equals(1, "true"));
@@ -1468,7 +1472,7 @@ bool ClientSession::handleKitToClientMessage(const char* buffer, const int lengt
             {
                 std::string result;
                 LOG_DBG("Saving template [" << _wopiFileInfo->getTemplateSource() << "] to storage");
-                docBroker->saveToStorage(getId(), true, result, /*force=*/false);
+                docBroker->uploadToStorage(getId(), true, result, /*force=*/false);
             }
 
             for(auto &token : tokens)

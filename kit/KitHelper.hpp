@@ -17,6 +17,8 @@
 
 namespace LOKitHelper
 {
+    constexpr auto tunnelledDialogImageCacheSize = 100;
+
     inline std::string documentTypeToString(LibreOfficeKitDocumentType type)
     {
         switch (type)

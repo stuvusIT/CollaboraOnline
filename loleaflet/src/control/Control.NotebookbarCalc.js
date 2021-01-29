@@ -31,13 +31,13 @@ L.Control.NotebookbarCalc = L.Control.NotebookbarWriter.extend({
 			},
 			{
 				'text': _('~Data'),
-				'id': '5',
-				'name': 'DataLabel'
+				'id': '-5',
+				'name': 'Data'
 			},
 			{
 				'text': _('~Review'),
-				'id': '6',
-				'name': 'ReviewLabel'
+				'id': '-6',
+				'name': 'Review'
 			},
 			{
 				'text': _('~Help'),
@@ -63,6 +63,14 @@ L.Control.NotebookbarCalc = L.Control.NotebookbarWriter.extend({
 
 		case 'Insert':
 			this.loadTab(this.getInsertTab());
+			break;
+
+		case 'Data':
+			this.loadTab(this.getDataTab());
+			break;
+
+		case 'Review':
+			this.loadTab(this.getReviewTab());
 			break;
 		}
 	},
@@ -1972,12 +1980,11 @@ L.Control.NotebookbarCalc = L.Control.NotebookbarWriter.extend({
 							}
 						]
 					},
-					window.mode.isDesktop()? {
+					{
 						'id': 'freeze-section1',
 						'type': 'container',
 						'text': '',
 						'enabled': 'true',
-						'vertical': 'true',
 						'children': [
 							{
 								'id': 'Section7',
@@ -1986,15 +1993,15 @@ L.Control.NotebookbarCalc = L.Control.NotebookbarWriter.extend({
 								'enabled': 'true',
 								'children': [
 									{
-										'type': 'toolitem',
+										'type': 'bigtoolitem',
 										'text': _UNO('.uno:FreezePanes', 'spreadsheet', true),
 										'command': '.uno:FreezePanes'
 									}
 								]
 							}
 						]
-					} : {},
-					window.mode.isDesktop()? {
+					},
+					{
 						'id': 'freeze-section2',
 						'type': 'container',
 						'text': '',
@@ -2028,7 +2035,7 @@ L.Control.NotebookbarCalc = L.Control.NotebookbarWriter.extend({
 								]
 							}
 						]
-					} : {}
+					}
 				]
 			}
 		];
@@ -2327,6 +2334,523 @@ L.Control.NotebookbarCalc = L.Control.NotebookbarWriter.extend({
 		];
 
 		return this.getNotebookbar([this.getTabPage('Insert', content)], '-4');
+	},
+
+	getDataTab: function() {
+		var content = [
+			{
+				'id': 'Data-Section-Calculate',
+				'type': 'container',
+				'children': [
+					{
+						'id': 'separator37',
+						'type': 'separator',
+						'orientation': 'vertical'
+					},
+					{
+						'id': 'SectionBottom13',
+						'type': 'toolbox',
+						'children': [
+							{
+								'type': 'bigtoolitem',
+								'text': _UNO('.uno:Calculate', 'spreadsheet'),
+								'command': '.uno:Calculate'
+							}
+						]
+					}
+				]
+			},
+			{
+				'id': 'Data-Section-PivotTable',
+				'type': 'container',
+				'children': [
+					{
+						'id': 'separator377',
+						'type': 'separator',
+						'orientation': 'vertical'
+					},
+					{
+						'id': 'SectionPivotTable1',
+						'type': 'toolbox',
+						'children': [
+							{
+								'type': 'bigtoolitem',
+								'text': _UNO('.uno:DataDataPilotRun', 'spreadsheet'),
+								'command': '.uno:DataDataPilotRun'
+							}
+						]
+					},
+					{
+						'id': 'GroupPivotTable1',
+						'type': 'container',
+						'children': [
+							{
+								'id': 'ToolBoxPivotTable1',
+								'type': 'toolbox',
+								'children': [
+									{
+										'type': 'toolitem',
+										'text': _UNO('.uno:RecalcPivotTable', 'spreadsheet'),
+										'command': '.uno:RecalcPivotTable'
+									}
+								]
+							},
+							{
+								'id': 'ToolBoxPivotTable2',
+								'type': 'toolbox',
+								'children': [
+									{
+										'type': 'toolitem',
+										'text': _UNO('.uno:DeletePivotTable', 'spreadsheet'),
+										'command': '.uno:DeletePivotTable'
+									}
+								]
+							}
+						],
+						'vertical': 'true'
+					}
+				]
+			},
+			{
+				'id': 'Data-Section-Sort',
+				'type': 'container',
+				'children': [
+					{
+						'id': 'separator18',
+						'type': 'separator',
+						'orientation': 'vertical'
+					},
+					{
+						'id': 'SectionBottom3',
+						'type': 'toolbox',
+						'children': [
+							{
+								'type': 'bigtoolitem',
+								'text': _UNO('.uno:DataSort', 'spreadsheet'),
+								'command': '.uno:DataSort'
+							}
+						]
+					}
+				]
+			},
+			{
+				'id': 'Data-Section-Sort1',
+				'type': 'container',
+				'children': [
+					{
+						'id': 'GroupB39',
+						'type': 'container',
+						'children': [
+							{
+								'id': 'LeftParaMargin8',
+								'type': 'toolbox',
+								'children': [
+									{
+										'type': 'toolitem',
+										'text': _UNO('.uno:SortAscending', 'spreadsheet'),
+										'command': '.uno:SortAscending'
+									}
+								]
+							},
+							{
+								'id': 'belowspacing8',
+								'type': 'toolbox',
+								'children': [
+									{
+										'type': 'toolitem',
+										'text': _UNO('.uno:SortDescending', 'spreadsheet'),
+										'command': '.uno:SortDescending'
+									}
+								]
+							}
+						],
+						'vertical': 'true'
+					}
+				]
+			},
+			{
+				'id': 'Data-Section-Filter',
+				'type': 'container',
+				'children': [
+					{
+						'id': 'separator19',
+						'type': 'separator',
+						'orientation': 'vertical'
+					},
+					{
+						'id': 'GroupB458',
+						'type': 'container',
+						'children': [
+							{
+								'id': 'SectionBottom8',
+								'type': 'toolbox',
+								'children': [
+									{
+										'type': 'toolitem',
+										'text': _UNO('.uno:DataFilterAutoFilter', 'spreadsheet'),
+										'command': '.uno:DataFilterAutoFilter'
+									}
+								]
+							},
+							{
+								'id': 'SectionBottom88',
+								'type': 'toolbox',
+								'children': [
+									{
+										'type': 'toolitem',
+										'text': _UNO('.uno:DataFilterSpecialFilter', 'spreadsheet'),
+										'command': '.uno:DataFilterSpecialFilter'
+									}
+								]
+							}
+						],
+						'vertical': 'true'
+					}
+				]
+			},
+			{
+				'id': 'Data-Section-Filter1',
+				'type': 'container',
+				'children': [
+					{
+						'id': 'GroupB45',
+						'type': 'container',
+						'children': [
+							{
+								'id': 'belowspacing9',
+								'type': 'toolbox',
+								'children': [
+									{
+										'type': 'toolitem',
+										'text': _UNO('.uno:DataFilterStandardFilter', 'spreadsheet'),
+										'command': '.uno:DataFilterStandardFilter'
+									}
+								]
+							},
+							{
+								'id': 'LeftParaMargin9',
+								'type': 'toolbox',
+								'children': [
+									{
+										'type': 'toolitem',
+										'text': _UNO('.uno:DataFilterHideAutoFilter', 'spreadsheet'),
+										'command': '.uno:DataFilterHideAutoFilter'
+									}
+								]
+							}
+						],
+						'vertical': 'true'
+					}
+				]
+			},
+			{
+				'id': 'Data-Section-Group1',
+				'type': 'container',
+				'children': [
+					{
+						'id': 'GroupB54',
+						'type': 'container',
+						'children': [
+							{
+								'id': 'LeftParaMargin14',
+								'type': 'toolbox',
+								'children': [
+									{
+										'type': 'toolitem',
+										'text': _UNO('.uno:Group'),
+										'command': '.uno:Group'
+									}
+								]
+							},
+							{
+								'id': 'belowspacing16',
+								'type': 'toolbox',
+								'children': [
+									{
+										'type': 'toolitem',
+										'text': _UNO('.uno:Ungroup'),
+										'command': '.uno:Ungroup'
+									}
+								]
+							}
+						],
+						'vertical': 'true'
+					}
+				]
+			},
+			{
+				'id': 'Data-Section-Group2',
+				'type': 'container',
+				'children': [
+					{
+						'id': 'GroupB92',
+						'type': 'container',
+						'children': [
+							{
+								'id': 'LeftParaMargin15',
+								'type': 'toolbox',
+								'children': [
+									{
+										'type': 'toolitem',
+										'text': _UNO('.uno:HideDetail'),
+										'command': '.uno:HideDetail'
+									}
+								]
+							},
+							{
+								'id': 'belowspacing17',
+								'type': 'toolbox',
+								'children': [
+									{
+										'type': 'toolitem',
+										'text': _UNO('.uno:ShowDetail'),
+										'command': '.uno:ShowDetail'
+									}
+								]
+							}
+						],
+						'vertical': 'true'
+					}
+				]
+			},
+			{
+				'id': 'Data-Section-NamedRanges',
+				'type': 'container',
+				'children': [
+					{
+						'id': 'GroupB561',
+						'type': 'container',
+						'children': [
+							{
+								'id': 'LeftParaMargin161',
+								'type': 'toolbox',
+								'children': [
+									{
+										'type': 'toolitem',
+										'text': _UNO('.uno:AddName', 'spreadsheet'),
+										'command': '.uno:AddName'
+									}
+								]
+							},
+							{
+								'id': 'belowspacing181',
+								'type': 'toolbox',
+								'children': [
+									{
+										'type': 'toolitem',
+										'text': _UNO('.uno:DefineName', 'spreadsheet'),
+										'command': '.uno:DefineName'
+									}
+								]
+							}
+						],
+						'vertical': 'true'
+					}
+				]
+			},
+			{
+				'id': 'Data-Section-TextToColumn1',
+				'type': 'container',
+				'children': [
+					{
+						'id': 'GroupB65',
+						'type': 'container',
+						'children': [
+							{
+								'id': 'belowspacing11',
+								'type': 'toolbox',
+								'children': [
+									{
+										'type': 'bigtoolitem',
+										'text': _UNO('.uno:Validation', 'spreadsheet'),
+										'command': '.uno:Validation'
+									}
+								]
+							}
+						]
+					}
+				]
+			},
+			{
+				'id': 'Data-Section-Statistic',
+				'type': 'container',
+				'children': [
+					{
+						'id': 'separator41',
+						'type': 'separator',
+						'orientation': 'vertical'
+					},
+					{
+						'id': 'Data-StatisticsMenu:Menu Statistic',
+						'type': 'menubutton',
+						'text': _UNO('.uno:StatisticsMenu', 'spreadsheet'),
+						'enabled': 'true'
+					}
+				]
+			}
+		];
+
+		return this.getNotebookbar([this.getTabPage('Data', content)], '-5');
+	},
+
+	getReviewTab: function() {
+		var content = [
+			{
+				'id': 'Review-Section-Language',
+				'type': 'container',
+				'children': [
+					{
+						'id': 'SectionBottom67',
+						'type': 'toolbox',
+						'children': [
+							{
+								'type': 'bigtoolitem',
+								'text': _UNO('.uno:SpellDialog'),
+								'command': '.uno:SpellDialog'
+							},
+							{
+								'type': 'bigtoolitem',
+								'text': _UNO('.uno:ThesaurusDialog'),
+								'command': '.uno:ThesaurusDialog'
+							}
+						]
+					}
+				]
+			},
+			{
+				'id': 'Review-Section-Language1',
+				'type': 'container',
+				'children': [
+					{
+						'id': 'GroupB40',
+						'type': 'container',
+						'children': [
+							{
+								'id': 'LineA19',
+								'type': 'toolbox',
+								'children': [
+									{
+										'type': 'toolitem',
+										'text': _UNO('.uno:SpellOnline'),
+										'command': '.uno:SpellOnline'
+									}
+								]
+							},
+							{
+								'id': 'LineB20',
+								'type': 'toolbox',
+								'children': [
+									{
+										'type': 'toolitem',
+										'text': _UNO('.uno:Hyphenate', 'spreadsheet'),
+										'command': '.uno:Hyphenate'
+									}
+								]
+							}
+						],
+						'vertical': 'true'
+					}
+				]
+			},
+			{
+				'id': 'Review-Section-Annotation',
+				'type': 'container',
+				'children': [
+					{
+						'id': 'separator109',
+						'type': 'separator',
+						'orientation': 'vertical'
+					},
+					{
+						'id': 'SectionBottom69',
+						'type': 'toolbox',
+						'children': [
+							{
+								'type': 'bigtoolitem',
+								'text': _UNO('.uno:InsertAnnotation'),
+								'command': '.uno:InsertAnnotation'
+							}
+						]
+					}
+				]
+			},
+			{
+				'id': 'Review-Section-Annotation2',
+				'type': 'container',
+				'children': [
+					{
+						'id': 'GroupB43',
+						'type': 'container',
+						'children': [
+							{
+								'id': 'LeftParaMargin17',
+								'type': 'toolbox',
+								'children': [
+									{
+										'type': 'toolitem',
+										'text': _UNO('.uno:DeleteAllNotes'),
+										'command': '.uno:DeleteAllNotes'
+									}
+								]
+							},
+							{
+								'id': 'belowspacing15',
+								'type': 'toolbox',
+								'children': [
+									{
+										'type': 'toolitem',
+										'text': _UNO('.uno:DeleteNote', 'spreadsheet'),
+										'command': '.uno:DeleteNote'
+									}
+								]
+							}
+						],
+						'vertical': 'true'
+					}
+				]
+			},
+			{
+				'id': 'Review-Section-TrackChanges',
+				'type': 'container',
+				'children': [
+					{
+						'id': 'separator112',
+						'type': 'separator',
+						'orientation': 'vertical'
+					},
+					{
+						'id': 'SectionBottom72',
+						'type': 'toolbox',
+						'children': [
+							{
+								'type': 'bigtoolitem',
+								'text': _UNO('.uno:TraceChangeMode', 'spreadsheet'),
+								'command': '.uno:TraceChangeMode'
+							}
+						]
+					}
+				]
+			},
+			{
+				'id': 'Review-Section-TrackChanges1',
+				'type': 'container',
+				'children': [
+					{
+						'id': 'SectionBottom88',
+						'type': 'toolbox',
+						'children': [
+							{
+								'type': 'bigtoolitem',
+								'text': _UNO('.uno:AcceptChanges', 'spreadsheet'),
+								'command': '.uno:AcceptChanges'
+							}
+						]
+					}
+				]
+			}
+		];
+
+		return this.getNotebookbar([this.getTabPage('Review', content)], '-6');
 	}
 });
 

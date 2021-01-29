@@ -171,12 +171,9 @@ DocumentBroker::DocumentBroker(ChildType type,
     _docKey(docKey),
     _docId(Util::encodeId(DocBrokerId++, 3)),
     _documentChangedInStorage(false),
-    _lastStorageSaveSuccessful(true),
+    _lastStorageUploadSuccessful(true),
     _lastSaveTime(std::chrono::steady_clock::now()),
     _lastSaveRequestTime(std::chrono::steady_clock::now() - std::chrono::milliseconds(COMMAND_TIMEOUT_MS)),
-    _markToDestroy(false),
-    _closeRequest(false),
-    _isLoaded(false),
     _isModified(false),
     _cursorPosX(0),
     _cursorPosY(0),
@@ -322,7 +319,7 @@ void DocumentBroker::pollThread()
         if (_tileCache)
             _tileCache->setMaxCacheSize(8 * 1024 * 128 * _sessions.size());
 
-        if (!_isLoaded && (limit_load_secs > 0) && (now > loadDeadline))
+        if (!isLoaded() && (limit_load_secs > 0) && (now > loadDeadline))
         {
             LOG_ERR("Doc [" << _docKey << "] is taking too long to load. Will kill process ["
                     << _childProcess->getPid() << "]. per_document.limit_load_secs set to "
@@ -394,7 +391,7 @@ void DocumentBroker::pollThread()
             continue;
         }
 
-        if (SigUtil::getShutdownRequestFlag() || _closeRequest)
+        if (SigUtil::getShutdownRequestFlag() || _docState.isCloseRequested())
         {
             const std::string reason = SigUtil::getShutdownRequestFlag() ? "recycling" : _closeReason;
             LOG_INF("Autosaving DocumentBroker for docKey [" << getDocKey() << "] for " << reason);
@@ -452,7 +449,7 @@ void DocumentBroker::pollThread()
             }
         }
 #endif
-        else if (_sessions.empty() && (isLoaded() || _markToDestroy))
+        else if (_sessions.empty() && (isLoaded() || _docState.isMarkedToDestroy()))
         {
             // If all sessions have been removed, no reason to linger.
             LOG_INF("Terminating dead DocumentBroker for docKey [" << getDocKey() << "].");
@@ -560,7 +557,7 @@ void DocumentBroker::stop(const std::string& reason)
     _poll->wakeup();
 }
 
-bool DocumentBroker::load(const std::shared_ptr<ClientSession>& session, const std::string& jailId)
+bool DocumentBroker::download(const std::shared_ptr<ClientSession>& session, const std::string& jailId)
 {
     assertCorrectThread();
 
@@ -575,7 +572,7 @@ bool DocumentBroker::load(const std::shared_ptr<ClientSession>& session, const s
             return result;
     }
 
-    if (_markToDestroy)
+    if (_docState.isMarkedToDestroy())
     {
         // Tearing down.
         LOG_WRN("Will not load document marked to destroy. DocKey: [" << _docKey << "].");
@@ -596,6 +593,8 @@ bool DocumentBroker::load(const std::shared_ptr<ClientSession>& session, const s
     bool firstInstance = false;
     if (_storage == nullptr)
     {
+        _docState.setStatus(DocumentState::Status::Downloading);
+
         // Pass the public URI to storage as it needs to load using the token
         // and other storage-specific data provided in the URI.
         const Poco::URI& uriPublic = session->getPublicUri();
@@ -799,11 +798,13 @@ bool DocumentBroker::load(const std::shared_ptr<ClientSession>& session, const s
 
     broadcastLastModificationTime(session);
 
-    // Let's load the document now, if not loaded.
+    // Let's download the document now, if not downloaded.
     if (!_storage->isLoaded())
     {
         std::string localPath = _storage->downloadStorageFileToLocal(
             session->getAuthorization(), session->getCookies(), *_lockCtx, templateSource);
+
+        _docState.setStatus(DocumentState::Status::Loading); // Done downloading.
 
         // Only lock the document on storage for editing sessions
         // FIXME: why not lock before downloadStorageFileToLocal? Would also prevent race conditions
@@ -944,8 +945,8 @@ bool DocumentBroker::attemptLock(const ClientSession& session, std::string& fail
     return bResult;
 }
 
-void DocumentBroker::saveToStorage(const std::string& sessionId, bool success,
-                                   const std::string& result, bool force)
+void DocumentBroker::uploadToStorage(const std::string& sessionId, bool success,
+                                     const std::string& result, bool force)
 {
     assertCorrectThread();
 
@@ -959,7 +960,7 @@ void DocumentBroker::saveToStorage(const std::string& sessionId, bool success,
             LOG_TRC("Enabling forced saving to storage per always_save_on_exit config.");
             force = true;
         }
-        else if (!_lastStorageSaveSuccessful)
+        else if (!_lastStorageUploadSuccessful)
         {
             LOG_TRC("Enabling forced saving to storage as last attempt had failed.");
             force = true;
@@ -972,31 +973,32 @@ void DocumentBroker::saveToStorage(const std::string& sessionId, bool success,
     }
 
     constexpr bool isRename = false;
-    saveToStorageInternal(sessionId, success, result, /*saveAsPath*/ std::string(),
-                          /*saveAsFilename*/ std::string(), isRename, force);
+    uploadToStorageInternal(sessionId, success, result, /*saveAsPath*/ std::string(),
+                            /*saveAsFilename*/ std::string(), isRename, force);
 
     // If marked to destroy, or session is disconnected, remove.
     const auto it = _sessions.find(sessionId);
-    if (_markToDestroy || (it != _sessions.end() && it->second->isCloseFrame()))
+    if (_docState.isMarkedToDestroy() || (it != _sessions.end() && it->second->isCloseFrame()))
         disconnectSessionInternal(sessionId);
 
     // If marked to destroy, then this was the last session.
-    if (_markToDestroy || _sessions.empty())
+    if (_docState.isMarkedToDestroy() || _sessions.empty())
     {
         // Stop so we get cleaned up and removed.
         _stop = true;
     }
 }
 
-void DocumentBroker::saveAsToStorage(const std::string& sessionId, const std::string& saveAsPath,
-                                     const std::string& saveAsFilename, const bool isRename)
+void DocumentBroker::uploadAsToStorage(const std::string& sessionId,
+                                       const std::string& uploadAsPath,
+                                       const std::string& uploadAsFilename, const bool isRename)
 {
     assertCorrectThread();
 
-    saveToStorageInternal(sessionId, true, "", saveAsPath, saveAsFilename, isRename);
+    uploadToStorageInternal(sessionId, true, "", uploadAsPath, uploadAsFilename, isRename);
 }
 
-void DocumentBroker::saveToStorageInternal(const std::string& sessionId, bool success,
+void DocumentBroker::uploadToStorageInternal(const std::string& sessionId, bool success,
                                            const std::string& result, const std::string& saveAsPath,
                                            const std::string& saveAsFilename, const bool isRename,
                                            const bool force)
@@ -1090,7 +1092,7 @@ void DocumentBroker::handleUploadToStorageResponse(
 {
     // Storage save is considered successful when either storage returns OK or the document on the storage
     // was changed and it was used to overwrite local changes
-    _lastStorageSaveSuccessful
+    _lastStorageUploadSuccessful
         = storageSaveResult.getResult() == StorageBase::UploadResult::Result::OK ||
         storageSaveResult.getResult() == StorageBase::UploadResult::Result::DOC_CHANGED;
     if (storageSaveResult.getResult() == StorageBase::UploadResult::Result::OK)
@@ -1249,9 +1251,9 @@ void DocumentBroker::broadcastSaveResult(bool success, const std::string& result
 
 void DocumentBroker::setLoaded()
 {
-    if (!_isLoaded)
+    if (!isLoaded())
     {
-        _isLoaded = true;
+        _docState.setLive();
         _loadDuration = std::chrono::duration_cast<std::chrono::milliseconds>(
                                 std::chrono::steady_clock::now() - _threadStart);
         LOG_TRC("Document loaded in " << _loadDuration);
@@ -1306,7 +1308,7 @@ bool DocumentBroker::autoSave(const bool force, const bool dontSaveIfUnmodified)
     assertCorrectThread();
 
     LOG_TRC("autoSave(): forceful? " << force);
-    if (_sessions.empty() || _storage == nullptr || !_isLoaded ||
+    if (_sessions.empty() || _storage == nullptr || !isLoaded() ||
         !_childProcess->isAlive() || (!isModified() && !force))
     {
         // Nothing to do.
@@ -1457,7 +1459,7 @@ std::size_t DocumentBroker::addSession(const std::shared_ptr<ClientSession>& ses
         if (_sessions.empty())
         {
             LOG_INF("Doc [" << _docKey << "] has no more sessions. Marking to destroy.");
-            _markToDestroy = true;
+            _docState.markToDestroy();
         }
 
         throw;
@@ -1470,8 +1472,8 @@ std::size_t DocumentBroker::addSessionInternal(const std::shared_ptr<ClientSessi
 
     try
     {
-        // First load the document, since this can fail.
-        if (!load(session, _childProcess->getJailId()))
+        // First, download the document, since this can fail.
+        if (!download(session, _childProcess->getJailId()))
         {
             const auto msg = "Failed to load document with URI [" + session->getPublicUri().toString() + "].";
             LOG_ERR(msg);
@@ -1536,7 +1538,11 @@ std::size_t DocumentBroker::removeSession(const std::string& id)
         std::shared_ptr<ClientSession> session = it->second;
 
         // Last view going away, can destroy.
-        _markToDestroy = (_sessions.size() <= 1);
+        if (_sessions.size() <= 1)
+            _docState.markToDestroy();
+
+        assert((_sessions.size() <= 1 && _docState.isMarkedToDestroy())
+               || !_docState.isMarkedToDestroy());
 
         const bool lastEditableSession = (!session->isReadOnly() || session->isAllowChangeComments()) && !haveAnotherEditableSession(id);
         static const bool dontSaveIfUnmodified = !LOOLWSD::getConfigValue<bool>("per_document.always_save_on_exit", false);
@@ -1545,7 +1551,7 @@ std::size_t DocumentBroker::removeSession(const std::string& id)
                 << id << "] on docKey [" << _docKey << "]. Have " << _sessions.size()
                 << " sessions. IsReadOnly: " << session->isReadOnly()
                 << ", IsViewLoaded: " << session->isViewLoaded() << ", IsWaitDisconnected: "
-                << session->inWaitDisconnected() << ", MarkToDestroy: " << _markToDestroy
+                << session->inWaitDisconnected() << ", MarkToDestroy: " << _docState.isMarkedToDestroy()
                 << ", LastEditableSession: " << lastEditableSession << ", DontSaveIfUnmodified: "
                 << dontSaveIfUnmodified << ", IsPossiblyModified: " << isPossiblyModified());
 
@@ -1598,10 +1604,10 @@ void DocumentBroker::disconnectSessionInternal(const std::string& id)
 #endif
 
             LOG_TRC("Disconnect session internal " << id <<
-                    " destroy? " << _markToDestroy <<
+                    " destroy? " << _docState.isMarkedToDestroy() <<
                     " locked? " << _lockCtx->_isLocked);
 
-            if (_markToDestroy && // last session to remove; FIXME: Editable?
+            if (_docState.isMarkedToDestroy() && // last session to remove; FIXME: Editable?
                 _lockCtx->_isLocked && _storage)
             {
                 if (!_storage->updateLockState(it->second->getAuthorization(), it->second->getCookies(), *_lockCtx, false))
@@ -2280,7 +2286,6 @@ bool DocumentBroker::forwardToChild(const std::string& viewId, const std::string
 
     // try the not yet created sessions
     LOG_WRN("Child session [" << viewId << "] not found to forward message: " << getAbbreviatedMessage(message));
-
     return false;
 }
 
@@ -2405,7 +2410,7 @@ void DocumentBroker::closeDocument(const std::string& reason)
 
     LOG_DBG("Closing DocumentBroker for docKey [" << _docKey << "] with reason: " << reason);
     _closeReason = reason;
-    _closeRequest = true;
+    _docState.setCloseRequested();
 }
 
 void DocumentBroker::broadcastMessage(const std::string& message) const
@@ -2573,11 +2578,11 @@ void DocumentBroker::dumpState(std::ostream& os)
     auto now = std::chrono::steady_clock::now();
 
     os << " Broker: " << LOOLWSD::anonymizeUrl(_filename) << " pid: " << getPid();
-    if (_markToDestroy)
+    if (_docState.isMarkedToDestroy())
         os << " *** Marked to destroy ***";
     else
         os << " has live sessions";
-    if (_isLoaded)
+    if (isLoaded())
         os << "\n  loaded in: " << _loadDuration;
     else
         os << "\n  still loading... " <<
@@ -2597,7 +2602,7 @@ void DocumentBroker::dumpState(std::ostream& os)
     os << "\n  last saved: " << Util::getSteadyClockAsString(_lastSaveTime);
     os << "\n  last save request: " << Util::getSteadyClockAsString(_lastSaveRequestTime);
     os << "\n  last save response: " << Util::getSteadyClockAsString(_lastSaveResponseTime);
-    os << "\n  last storage save was successful: " << isLastStorageSaveSuccessful();
+    os << "\n  last storage save was successful: " << isLastStorageUploadSuccessful();
     os << "\n  last modified: " << Util::getHttpTime(_documentLastModifiedTime);
     os << "\n  file last modified: " << Util::getHttpTime(_lastFileModifiedTime);
     if (_limitLifeSeconds > std::chrono::seconds::zero())

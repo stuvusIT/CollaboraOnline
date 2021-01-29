@@ -202,6 +202,8 @@ L.TileSectionManager = L.Class.extend({
 		if (!ctx)
 			ctx = this._paintContext();
 
+		this._sectionContainer.setPenPosition(this._tilesSection);
+
 		if (ctx.paneBoundsActive === true)
 			this._paintWithPanes(tile, ctx);
 		else
@@ -210,16 +212,16 @@ L.TileSectionManager = L.Class.extend({
 
 	_addTilesSection: function () {
 		var that = this;
-		this._sectionContainer.addSection({
-			name: 'tiles',
+		this._sectionContainer.createSection({
+			name: L.CSections.Tiles.name,
 			anchor: 'top left',
 			position: [250 * that._dpiScale, 250 * that._dpiScale], // Set its initial position to somewhere blank. Other sections shouldn't cover this point after initializing.
 			size: [0, 0], // Going to be expanded, no initial width or height is necessary.
 			expand: 'top left bottom right', // Expand to all directions.
-			processingOrder: 1,
-			drawingOrder: 5,
-			zIndex: 5,
-			interactable: true,
+			processingOrder: L.CSections.Tiles.processingOrder,
+			drawingOrder: L.CSections.Tiles.drawingOrder,
+			zIndex: L.CSections.Tiles.zIndex,
+			interactable: false,
 			sectionProperties: {
 				docLayer: that._layer,
 				tsManager: that
@@ -233,15 +235,15 @@ L.TileSectionManager = L.Class.extend({
 
 	_addGridSection: function () {
 		var that = this;
-		this._sectionContainer.addSection({
-			name: 'calc grid',
+		this._sectionContainer.createSection({
+			name: L.CSections.CalcGrid.name,
 			anchor: 'top left',
 			position: [0, 0],
 			size: [0, 0],
 			expand: '',
-			processingOrder: 2, // Size and position will be copied, this value is not important.
-			drawingOrder: 4,
-			zIndex: 5,
+			processingOrder: L.CSections.CalcGrid.processingOrder, // Size and position will be copied, this value is not important.
+			drawingOrder: L.CSections.CalcGrid.drawingOrder,
+			zIndex: L.CSections.CalcGrid.zIndex,
 			// Even if this one is drawn on top, won't be able to catch events.
 			// Sections with "interactable: true" can catch events even if they are under a section with property "interactable: false".
 			interactable: false,
@@ -302,15 +304,15 @@ L.TileSectionManager = L.Class.extend({
 	// This section is added when debug is enabled. Splits are enabled for only Calc for now.
 	_addSplitsSection: function () {
 		var that = this;
-		this._sectionContainer.addSection({
-			name: 'splits',
+		this._sectionContainer.createSection({
+			name: L.CSections.Debug.Splits.name,
 			anchor: 'top left',
 			position: [0, 0],
 			size: [0, 0],
 			expand: '',
-			processingOrder: 3, // Size and position will be copied, this value is not important.
-			drawingOrder: 8, // Above tiles section (same zIndex, higher drawing order).
-			zIndex: 5,
+			processingOrder: L.CSections.Debug.Splits.processingOrder,
+			drawingOrder: L.CSections.Debug.Splits.drawingOrder,
+			zIndex: L.CSections.Debug.Splits.zIndex,
 			// Even if this one is drawn on top, won't be able to catch events.
 			// Sections with "interactable: true" can catch events even if they are under a section with property "interactable: false".
 			interactable: false,
@@ -324,15 +326,15 @@ L.TileSectionManager = L.Class.extend({
 	// This section is added when debug is enabled.
 	_addTilePixelGridSection: function () {
 		var that = this;
-		this._sectionContainer.addSection({
-			name: 'tile pixel grid',
+		this._sectionContainer.createSection({
+			name: L.CSections.Debug.TilePixelGrid.name,
 			anchor: 'top left',
 			position: [0, 0],
 			size: [0, 0],
 			expand: '',
-			processingOrder: 4, // Size and position will be copied, this value is not important.
-			drawingOrder: 6,
-			zIndex: 5,
+			processingOrder: L.CSections.Debug.TilePixelGrid.processingOrder, // Size and position will be copied, this value is not important.
+			drawingOrder: L.CSections.Debug.TilePixelGrid.drawingOrder,
+			zIndex: L.CSections.Debug.TilePixelGrid.zIndex,
 			interactable: false,
 			sectionProperties: {},
 			onDraw: that._onDrawTilePixelGrid
@@ -531,7 +533,7 @@ L.CanvasTileLayer = L.TileLayer.extend({
 
 		L.TileLayer.prototype._initContainer.call(this);
 
-		var mapContainer = this._map.getContainer();
+		var mapContainer = document.getElementById('document-container');
 		var canvasContainerClass = 'leaflet-canvas-container';
 		this._canvasContainer = L.DomUtil.create('div', canvasContainerClass, mapContainer);
 		this._setup();
@@ -572,6 +574,7 @@ L.CanvasTileLayer = L.TileLayer.extend({
 		if (this._docType === 'spreadsheet') {
 			this._painter._addGridSection();
 		}
+		this._syncTileContainerSize();
 	},
 
 	_syncTilePanePos: function () {
@@ -813,7 +816,7 @@ L.CanvasTileLayer = L.TileLayer.extend({
 		return true;
 	},
 
-	_updateMaxBounds: function (sizeChanged, extraSize, options, zoom) {
+	_updateMaxBounds: function (sizeChanged, options, zoom) {
 		if (this._docWidthTwips === undefined || this._docHeightTwips === undefined) {
 			return;
 		}
@@ -822,6 +825,7 @@ L.CanvasTileLayer = L.TileLayer.extend({
 		}
 
 		var dpiScale = this._painter._dpiScale;
+		var extraSize = options ? options.extraSize : null;
 		var docPixelLimits = new L.Point(this._docWidthTwips / this.options.tileWidthTwips,
 			this._docHeightTwips / this.options.tileHeightTwips);
 		// docPixelLimits should be in csspx.

@@ -96,13 +96,19 @@ L.Control.JSDialog = L.Control.extend({
 
 	onJSUpdate: function (e) {
 		var data = e.data;
+
+		if (data.jsontype !== 'dialog')
+			return;
+
 		var dialog = this.dialogs[data.id];
 		if (!dialog)
 			return;
 
 		var control = dialog.querySelector('#' + data.control.id);
-		if (!control)
+		if (!control) {
+			console.warn('jsdialogupdate: not found control with id: "' + data.control.id + '"');
 			return;
+		}
 
 		var parent = control.parentNode;
 		if (!parent)
@@ -114,7 +120,9 @@ L.Control.JSDialog = L.Control.extend({
 			map: this.map,
 			cssClass: 'jsdialog'});
 
-		builder.build(parent, [data.control], false);
+		var temporaryParent = L.DomUtil.create('div');
+		builder.build(temporaryParent, [data.control], false);
+		parent.insertBefore(temporaryParent.firstChild, control.nextSibling);
 		L.DomUtil.remove(control);
 	},
 

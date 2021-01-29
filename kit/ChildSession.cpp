@@ -1031,6 +1031,7 @@ bool ChildSession::getTextSelection(const char* /*buffer*/, int /*length*/, cons
     }
 
     std::string selection;
+    getLOKitDocument()->setView(_viewId);
     const int selectionType = getLOKitDocument()->getSelectionType();
     if (selectionType == LOK_SELTYPE_LARGE_TEXT || selectionType == LOK_SELTYPE_COMPLEX ||
         (selection = getTextSelectionInternal(mimeType)).size() >= 1024 * 1024) // Don't return huge data.
@@ -1664,13 +1665,65 @@ bool ChildSession::renderWindow(const char* /*buffer*/, int /*length*/, const St
                                << " and rendered in " << elapsedMs << " (" << area / elapsedMics
                                << " MP/s).");
 
-    std::string response = "windowpaint: id=" + tokens[1] + " width=" + std::to_string(width)
+    uint64_t pixmapHash = Png::hashSubBuffer(pixmap.data(), 0, 0, width, height, bufferWidth, bufferHeight);
+
+    auto found = std::find(_pixmapCache.begin(), _pixmapCache.end(), pixmapHash);
+
+    assert(_pixmapCache.size() <= LOKitHelper::tunnelledDialogImageCacheSize);
+
+    // If not found in cache, we need to encode to PNG and send to client
+
+    // To artificially induce intentional cache inconsistency between server and client, to be able
+    // to test error handling, you can do something like:
+    // const bool doPng = (found == _pixmapCache.end() || (time(NULL) % 10 == 0)) && ((time(NULL) % 10) < 8);
+
+    const bool doPng = (found == _pixmapCache.end());
+
+    LOG_DBG("Pixmap hash: " << pixmapHash << (doPng ? " NOT in cache, doing PNG" : " in cache, not encoding to PNG") << ", cache size now:" << _pixmapCache.size());
+
+    // If it is already the first in the cache, no need to do anything. Otherwise, if in cache, move
+    // to beginning. If not in cache, add it as first. Keep cache size limited.
+    if (_pixmapCache.size() > 0)
+    {
+        if (found != _pixmapCache.begin())
+        {
+            if (found != _pixmapCache.end())
+            {
+                LOG_DBG("Erasing found entry");
+                _pixmapCache.erase(found);
+            }
+            else if (_pixmapCache.size() == LOKitHelper::tunnelledDialogImageCacheSize)
+            {
+                LOG_DBG("Popping last entry");
+                _pixmapCache.pop_back();
+            }
+            _pixmapCache.insert(_pixmapCache.begin(), pixmapHash);
+        }
+    }
+    else
+        _pixmapCache.insert(_pixmapCache.begin(), pixmapHash);
+
+    LOG_DBG("Pixmap cache size now:" << _pixmapCache.size());
+
+    assert(_pixmapCache.size() <= LOKitHelper::tunnelledDialogImageCacheSize);
+
+    std::string response = "windowpaint: id=" + std::to_string(winId) + " width=" + std::to_string(width)
                            + " height=" + std::to_string(height);
 
     if (!paintRectangle.empty())
         response += " rectangle=" + paintRectangle;
 
-    response += '\n';
+    response += " hash=" + std::to_string(pixmapHash);
+
+    if (!doPng)
+    {
+        // Just so that we might see in the client console log that no PNG was included.
+        response += " nopng";
+        sendTextFrame(response.c_str());
+        return true;
+    }
+
+    response += "\n";
 
     std::vector<char> output;
     output.reserve(response.size() + pixmapDataSize);
@@ -1686,7 +1739,20 @@ bool ChildSession::renderWindow(const char* /*buffer*/, int /*length*/, const St
         return false;
     }
 
-    LOG_TRC("Sending response (" << output.size() << " bytes) for: " << response);
+#if 0
+    {
+        static const std::string tempDir = FileUtil::createRandomTmpDir();
+        static int pngDumpCounter = 0;
+        std::stringstream ss;
+        ss << tempDir << "/" << "renderwindow-" << pngDumpCounter++ << ".png";
+        LOG_INF("Dumping PNG to '"<< ss.str() << "'");
+        FILE *f = fopen(ss.str().c_str(), "w");
+        fwrite(output.data() + response.size(), output.size() - response.size(), 1, f);
+        fclose(f);
+    }
+#endif
+
+    LOG_TRC("Sending response (" << output.size() << " bytes) for: " << std::string(output.data(), response.size() - 1));
     sendBinaryFrame(output.data(), output.size());
     return true;
 }
@@ -2174,7 +2240,7 @@ bool ChildSession::setClientPart(const char* /*buffer*/, int /*length*/, const S
 
     getLOKitDocument()->setView(_viewId);
 
-    if (getLOKitDocument()->getDocumentType() != LOK_DOCTYPE_TEXT)
+    if (getLOKitDocument()->getDocumentType() != LOK_DOCTYPE_TEXT && part != getLOKitDocument()->getPart())
     {
         getLOKitDocument()->setPart(part);
     }

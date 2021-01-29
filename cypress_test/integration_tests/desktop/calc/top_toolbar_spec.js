@@ -16,7 +16,72 @@ describe('Top toolbar tests.', function() {
 	afterEach(function() {
 		helper.afterAll(testFileName, this.currentTest.state);
 	});
+	function getTextEndPosForFirstCell() {
+		calcHelper.dblClickOnFirstCell();
 
+		helper.moveCursor('end');
+
+		helper.getCursorPos('left', 'currentTextEndPos');
+	}
+
+	it('Save.', function() {
+		cy.get('#tb_editbar_item_bold')
+			.click();
+
+		cy.get('#tb_editbar_item_save')
+			.click();
+
+		helper.beforeAll(testFileName, 'calc', true);
+
+		calcHelper.selectEntireSheet();
+
+		cy.get('#copy-paste-container table td b')
+			.should('exist');
+	});
+
+	it('Print', function() {
+		// A new window should be opened with the PDF.
+		cy.window()
+			.then(function(win) {
+				cy.stub(win, 'open');
+			});
+
+		cy.get('#tb_editbar_item_print')
+		    .click();
+
+		cy.window().its('open').should('be.called');
+	});
+
+	it('Enable text wrapping.', function() {
+		getTextEndPosForFirstCell();
+
+		helper.initAliasToNegative('originalTextEndPos');
+		cy.get('@currentTextEndPos')
+			.as('originalTextEndPos');
+
+		cy.get('@currentTextEndPos')
+			.should('be.greaterThan', 0);
+
+		calcHelper.selectFirstColumn();
+
+		cy.get('.w2ui-tb-image.w2ui-icon.wraptext')
+			.click();
+
+		calcHelper.clickOnFirstCell();
+
+		// We use the text position as indicator
+		cy.waitUntil(function() {
+			getTextEndPosForFirstCell();
+
+			return cy.get('@currentTextEndPos')
+				.then(function(currentTextEndPos) {
+					return cy.get('@originalTextEndPos')
+						.then(function(originalTextEndPos) {
+							return originalTextEndPos > currentTextEndPos;
+						});
+				});
+		});
+	});
 	it('Merge cells', function() {
 
 		// Select the full column

@@ -11,6 +11,9 @@ L.Socket = L.Class.extend({
 	WasShownLimitDialog: false,
 	WSDServer: {},
 
+	// Will be set from lokitversion message
+	TunnelledDialogImageCacheSize: 0,
+
 	getParameterValue: function (s) {
 		var i = s.indexOf('=');
 		if (i === -1)
@@ -319,6 +322,7 @@ L.Socket = L.Class.extend({
 			$('#lokit-version').html(lokitVersionObj.ProductName + ' ' +
 			                         lokitVersionObj.ProductVersion + lokitVersionObj.ProductExtension.replace('.10.','-') +
 			                         ' (git hash: ' + h + ')');
+			this.TunnelledDialogImageCacheSize = lokitVersionObj.tunnelled_dialog_image_cache_size;
 		}
 		else if (textMsg.startsWith('osinfo ')) {
 			var osInfo = textMsg.replace('osinfo ', '');
@@ -1092,10 +1096,10 @@ L.Socket = L.Class.extend({
 			this._map.fire('autofilterdropdown', msgData);
 		} else if (msgData.jsontype === 'dialog') {
 			this._map.fire('jsdialog', {data: msgData});
-		} else if (msgData.jsontype === 'notebookbar' || msgData.type === 'borderwindow') {
-			window.notebookbarId = msgData.id;
+		} else if (msgData.jsontype === 'notebookbar') {
 			for (var i = 0; i < msgData.children.length; i++) {
 				if (msgData.children[i].type === 'control') {
+					msgData.children[i].id = msgData.id;
 					this._map.fire('notebookbar', msgData.children[i]);
 					return;
 				}
@@ -1261,6 +1265,12 @@ L.Socket = L.Class.extend({
 				selectedParts.forEach(function (item) {
 					command.selectedParts.push(parseInt(item));
 				});
+			}
+			else if (tokens[i].startsWith('hash=')) {
+				command.hash = tokens[i].substring('hash='.length);
+			}
+			else if (tokens[i] === 'nopng') {
+				command.nopng = true;
 			}
 		}
 		if (command.tileWidth && command.tileHeight && this._map._docLayer) {

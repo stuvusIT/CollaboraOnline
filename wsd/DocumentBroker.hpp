@@ -103,6 +103,13 @@ class ClientSession;
 
 /// There is one DocumentBroker object in the WSD process for each document that is open (in 1..n sessions).
 
+
+/// To disambiguate between Storage and Core, we
+/// use 'Download' for Reading from the Storage,
+/// and 'Load' for Loading a document in Core.
+/// Similarly, we 'Upload' to Storage after we
+/// 'Save' the document in Core.
+
 class DocumentBroker : public std::enable_shared_from_this<DocumentBroker>
 {
     class DocumentBrokerPoll;
@@ -172,17 +179,17 @@ public:
 
     bool isDocumentChangedInStorage() { return _documentChangedInStorage; }
 
-    bool isLastStorageSaveSuccessful() { return _lastStorageSaveSuccessful; }
+    bool isLastStorageUploadSuccessful() { return _lastStorageUploadSuccessful; }
 
-    /// Save the document to Storage if it needs persisting.
+    /// Upload the document to Storage if it needs persisting.
     /// Results are logged and broadcast to users.
-    void saveToStorage(const std::string& sesionId, bool success, const std::string& result,
-                       bool force);
+    void uploadToStorage(const std::string& sesionId, bool success, const std::string& result,
+                         bool force);
 
-    /// Save As the document to Storage.
-    /// @param saveAsPath Absolute path to the jailed file.
-    void saveAsToStorage(const std::string& sesionId, const std::string& saveAsPath,
-                         const std::string& saveAsFilename, const bool isRename);
+    /// UploadAs the document to Storage, with a new name.
+    /// @param uploadAsPath Absolute path to the jailed file.
+    void uploadAsToStorage(const std::string& sesionId, const std::string& uploadAsPath,
+                           const std::string& uploadAsFilename, const bool isRename);
 
     bool isModified() const { return _isModified; }
     void setModified(const bool value);
@@ -267,7 +274,7 @@ public:
     static bool lookupSendClipboardTag(const std::shared_ptr<StreamSocket> &socket,
                                        const std::string &tag, bool sendError = false);
 
-    bool isMarkedToDestroy() const { return _markToDestroy || _stop; }
+    bool isMarkedToDestroy() const { return _docState.isMarkedToDestroy() || _stop; }
 
     bool handleInput(const std::vector<char>& payload);
 
@@ -319,8 +326,8 @@ private:
     void refreshLock();
 
     /// Loads a document from the public URI into the jail.
-    bool load(const std::shared_ptr<ClientSession>& session, const std::string& jailId);
-    bool isLoaded() const { return _isLoaded; }
+    bool download(const std::shared_ptr<ClientSession>& session, const std::string& jailId);
+    bool isLoaded() const { return _docState.hadLoaded(); }
 
     std::size_t getIdleTimeSecs() const
     {
@@ -347,12 +354,12 @@ private:
     /// with the child and cleans up ChildProcess etc.
     void terminateChild(const std::string& closeReason);
 
-    /// Saves the doc to the storage.
-    void saveToStorageInternal(const std::string& sesionId, bool success,
-                               const std::string& result = std::string(),
-                               const std::string& saveAsPath = std::string(),
-                               const std::string& saveAsFilename = std::string(),
-                               const bool isRename = false, const bool force = false);
+    /// Upload the doc to the storage.
+    void uploadToStorageInternal(const std::string& sesionId, bool success,
+                                 const std::string& result = std::string(),
+                                 const std::string& saveAsPath = std::string(),
+                                 const std::string& saveAsFilename = std::string(),
+                                 const bool isRename = false, const bool force = false);
 
     struct StorageUploadDetails
     {
@@ -417,6 +424,7 @@ protected:
     /// Seconds to live for, or 0 forever
     std::chrono::seconds _limitLifeSeconds;
     std::string _uriOrig;
+
 private:
     /// What type are we: affects priority.
     ChildType _type;
@@ -432,12 +440,98 @@ private:
     std::string _jailId;
     std::string _filename;
 
+    /// The state of the document.
+    /// This regulates all other primary operations.
+    class DocumentState
+    {
+    public:
+        /// Strictly speaking, these are phases that are directional.
+        /// A document starts as New and progresses towards Unloaded.
+        /// Upon error, intermediary states may be skipped.
+        enum class Status
+        {
+            None, //< Doesn't exist, pending downloading.
+            Downloading, //< Download from Storage to disk. Synchronous.
+            Loading, //< Loading the document in Core.
+            Live, //< General availability for viewing/editing.
+            Destroying, //< End-of-life, marked to destroy.
+            Destroyed //< Unloading complete, destruction pending.
+        };
+
+        static std::string toString(Status status)
+        {
+#define CASE(X)                                                                                    \
+    case X:                                                                                        \
+        return #X;
+            switch (status)
+            {
+                CASE(Status::None);
+                CASE(Status::Downloading);
+                CASE(Status::Loading);
+                CASE(Status::Live);
+                CASE(Status::Destroying);
+                CASE(Status::Destroyed);
+            }
+
+#undef CASE
+            return "Unknown Document Status";
+        }
+
+        DocumentState()
+            : _status(Status::None)
+            , _closeRequested(false)
+            , _loaded(false)
+        {
+        }
+
+        DocumentState::Status status() const { return _status; }
+        void setStatus(Status newStatus)
+        {
+            LOG_TRC("Setting DocumentState from " << toString(_status) << " to "
+                                                  << toString(newStatus));
+            assert(newStatus >= _status && "The document status cannot regress");
+            _status = newStatus;
+        }
+
+        /// True iff the document had ever loaded completely, without implying it's still loaded.
+        bool hadLoaded() const { return _loaded; }
+
+        /// True iff the document is fully loaded and available for viewing/editing.
+        bool isLive() const { return _status == Status::Live; }
+
+        /// Transitions to Status::Live, implying the document has loaded.
+        void setLive()
+        {
+            LOG_TRC("Setting DocumentState to Status::Live from " << toString(_status));
+            // assert(_status == Status::Loading
+            //        && "Document wasn't in Loading state to transition to Status::Live");
+            _loaded = true;
+            setStatus(Status::Live);
+        }
+
+        /// Flags the document for unloading and destruction.
+        void markToDestroy() { _status = Status::Destroying; }
+        bool isMarkedToDestroy() const { return _status >= Status::Destroying; }
+
+        /// Flag document termination. Cannot be reset.
+        void setCloseRequested() { _closeRequested = true; }
+        bool isCloseRequested() const { return _closeRequested; }
+
+    private:
+        Status _status;
+        std::atomic<bool> _closeRequested; //< Owner-Termination flag.
+        std::atomic<bool> _loaded; //< If the document ever loaded (check isLive to see if it still is).
+    };
+
+    /// The main state of the document.
+    DocumentState _docState;
+
     /// Set to true when document changed in storage and we are waiting
     /// for user's command to act.
     bool _documentChangedInStorage;
 
-    /// Indicates whether the last saveToStorage operation was successful.
-    bool _lastStorageSaveSuccessful;
+    /// Indicates whether the last uploadToStorage operation was successful.
+    bool _lastStorageUploadSuccessful;
 
     /// The last time we tried saving, regardless of whether the
     /// document was modified and saved or not.
@@ -463,9 +557,6 @@ private:
 
     std::unique_ptr<StorageBase> _storage;
     std::unique_ptr<TileCache> _tileCache;
-    std::atomic<bool> _markToDestroy;
-    std::atomic<bool> _closeRequest;
-    std::atomic<bool> _isLoaded;
     std::atomic<bool> _isModified;
     int _cursorPosX;
     int _cursorPosY;

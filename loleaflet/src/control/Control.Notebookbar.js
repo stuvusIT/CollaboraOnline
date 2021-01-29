@@ -11,11 +11,15 @@ L.Control.Notebookbar = L.Control.extend({
 	/// do we use cached JSON or already received something from the core
 	_isLoaded: false,
 
+	container: null,
+	builder: null,
+
 	onAdd: function (map) {
 		// log and test window.ThisIsTheiOSApp = true;
 		this.map = map;
 		this._currentScrollPosition = 0;
 
+		this.builder = new L.control.notebookbarBuilder({mobileWizard: this, map: map, cssClass: 'notebookbar'});
 		this.loadTab(this.getHomeTab());
 
 		this.createScrollButtons();
@@ -24,6 +28,7 @@ L.Control.Notebookbar = L.Control.extend({
 		this.map.on('contextchange', this.onContextChange, this);
 		this.map.on('notebookbar', this.onNotebookbar, this);
 		this.map.on('updatepermission', this.onUpdatePermission, this);
+		this.map.on('jsdialogupdate', this.onJSUpdate, this);
 
 		$('#toolbar-wrapper').addClass('hasnotebookbar');
 		$('.main-nav').addClass('hasnotebookbar');
@@ -53,7 +58,38 @@ L.Control.Notebookbar = L.Control.extend({
 		this.map.off('contextchange', this.onContextChange, this);
 		this.map.off('updatepermission', this.onUpdatePermission, this);
 		this.map.off('notebookbar');
+		this.map.off('jsdialogupdate', this.onJSUpdate, this);
 		this.clearNotebookbar();
+	},
+
+	onJSUpdate: function (e) {
+		var data = e.data;
+
+		if (data.jsontype !== 'notebookbar')
+			return;
+
+		if (!this.container)
+			return;
+
+		var control = this.container.querySelector('#' + data.control.id);
+		if (!control) {
+			console.warn('jsdialogupdate: not found control with id: "' + data.control.id + '"');
+			return;
+		}
+
+		var parent = control.parentNode;
+		if (!parent)
+			return;
+
+		if (!this.builder)
+			return;
+
+		control.style.visibility = 'hidden';
+
+		var temporaryParent = L.DomUtil.create('div');
+		this.builder.buildControl(temporaryParent, data.control);
+		parent.insertBefore(temporaryParent.firstChild, control.nextSibling);
+		L.DomUtil.remove(control);
 	},
 
 	onUpdatePermission: function(e) {
@@ -68,6 +104,8 @@ L.Control.Notebookbar = L.Control.extend({
 
 	onNotebookbar: function(data) {
 		this._isLoaded = true;
+		// setup id for events
+		this.builder.setWindowId(data.id);
 		this.loadTab(data);
 	},
 
@@ -105,12 +143,11 @@ L.Control.Notebookbar = L.Control.extend({
 
 	loadTab: function(tabJSON) {
 		this.clearNotebookbar();
-		var builder = new L.control.notebookbarBuilder({mobileWizard: this, map: this.map, cssClass: 'notebookbar'});
 
 		var parent = $('#toolbar-up').get(0);
-		var container = L.DomUtil.create('div', 'notebookbar-scroll-wrapper', parent);
+		this.container = L.DomUtil.create('div', 'notebookbar-scroll-wrapper', parent);
 
-		builder.build(container, [tabJSON]);
+		this.builder.build(this.container, [tabJSON]);
 
 		if (this._showNotebookbar === false)
 			this.hideTabs();
@@ -171,8 +208,7 @@ L.Control.Notebookbar = L.Control.extend({
 	createShortcutsBar: function() {
 		var shortcutsBar = L.DomUtil.create('div', 'notebookbar-shortcuts-bar');
 		$('#main-menu').after(shortcutsBar);
-		var builder = new L.control.notebookbarBuilder({mobileWizard: this, map: this.map, cssClass: 'notebookbar'});
-		builder.build(shortcutsBar, this.getShortcutsBarData());
+		this.builder.build(shortcutsBar, this.getShortcutsBarData());
 	},
 
 	setCurrentScrollPosition: function() {
@@ -244,7 +280,7 @@ L.Control.Notebookbar = L.Control.extend({
 				var contexts = tabs[tab].context.split('|');
 				for (var context in contexts) {
 					if (contexts[context] === event.context) {
-						var tabElement = $('#' + tabs[tab].name);
+						var tabElement = $('#' + tabs[tab].name + '-tab-label');
 						if (!tabElement.hasClass('selected'))
 							tabElement.click();
 					}
