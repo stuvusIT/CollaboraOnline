@@ -19,12 +19,12 @@ docker-build-master:
     - sudo sh get-docker.sh
     - cd docker/from-source
     - chmod +x build.sh
-    - adduser builder --gecos "First Last,RoomNumber,WorkPhone,HomePhone" --disabled-password
-    - 'echo "builder     ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers'
-    - sudo usermod -aG docker builder
+    - adduser stuvus --gecos "First Last,RoomNumber,WorkPhone,HomePhone" --disabled-password
+    - 'echo "stuvus     ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers'
+    - sudo usermod -aG docker stuvus
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
   script:
-    - 'su -c "bash build.sh" builder'
+    - 'su -c "bash build.sh" stuvus'
     - docker push "$CI_REGISTRY_IMAGE:latest"
   only:
     - master
@@ -50,13 +50,12 @@ docker-build:
     - sudo sh get-docker.sh
     - cd docker/from-source
     - chmod +x build.sh
-    - adduser builder --gecos "First Last,RoomNumber,WorkPhone,HomePhone" --disabled-password
-    - 'echo "builder     ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers'
-    - sudo usermod -aG docker builder
+    - adduser stuvus --gecos "First Last,RoomNumber,WorkPhone,HomePhone" --disabled-password
+    - 'echo "stuvus     ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers'
+    - sudo usermod -aG docker stuvus
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
   script:
-    - su -c whoami builder
-    - 'su -c "bash build.sh" builder'
+    - 'su -c "bash build.sh" stuvus'
     - docker push "$CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG"
   except:
     - master
